@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-28T09:40:31.857Z",
+  "model": "qwen3:4b",
+  "status": "passed",
+  "health": {
+    "api_version": "1",
+    "status": "ready",
+    "models": [
+      "qwen2.5:0.5b",
+      "qwen3:4b"
+    ],
+    "route": "local",
+    "detail": "Ollama connected"
+  },
+  "elapsed_ms": 37827,
+  "http_status": 200,
+  "response": {
+    "request_id": "26887630-f761-4b5d-867c-077646bed2b9",
+    "reply": "Hello! I'm Makoto Misaki.",
+    "citations": [],
+    "model": "qwen3:4b",
+    "route": "local",
+    "status": "ok",
+    "latency_ms": 37772
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "makoto-misaki",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "dev": "node scripts/dev.mjs",
+    "dev:ui": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "desktop": "node scripts/dev.mjs --desktop",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "test:backend": "node scripts/test-backend.mjs",
+    "test:launcher": "node --test tests/launcher.test.mjs",
+    "test:e2e": "playwright test",
+    "smoke:local": "node scripts/smoke-local.mjs",
+    "check": "npm run build && npm test && npm run test:backend",
+    "tauri": "tauri",
+    "test:desktop": "npm run build && node --test tests/desktop-actions.test.mjs && node tests/electron-smoke.mjs"
+  },
+  "dependencies": {
+    "@pixi/unsafe-eval": "^6.5.10",
+    "@tauri-apps/api": "2.12.4",
+    "lucide-react": "0.468.0",
+    "pixi-live2d-display": "^0.4.0",
+    "pixi.js": "^6.5.10",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@tauri-apps/cli": "2.12.4",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "electron": "^45.2.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "4.1.12"
+  },
+  "overrides": {
+    "gh-pages": "^6.3.0"
+  },
+  "main": "electron/main.mjs"
+}

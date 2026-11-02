@@ -1,0 +1,20 @@
+[package]
+name = "misaki"
+version = "0.1.0"
+description = "Makoto Misaki local desktop companion"
+authors = ["Priyadharshan"]
+edition = "2021"
+
+[lib]
+name = "misaki_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.5", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "=2.4.1"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+reqwest = { version = "=0.12.24", default-features = false, features = ["json"] }

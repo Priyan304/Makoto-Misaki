@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.cache/
+.venv/
+__pycache__/
+*.pyc
+*.tsbuildinfo
+src-tauri/target/
+test-results/
+playwright-report/
+.env
+.env.*
+!.env.example
+*.log

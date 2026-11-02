@@ -1,0 +1,21 @@
+# Default text handling
+* text=auto
+
+# Keep source and configuration files LF
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.moc3 binary
+*.mp3 binary
+*.wav binary

@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#171e1b"/><meta name="description" content="Makoto Misaki — your private, local desktop companion."/><title>Misaki · Your little corner of calm</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<style>
+html,body{margin:0;background:#171e1b}#startup-screen{position:fixed;inset:0;z-index:10000;display:grid;place-content:center;gap:16px;padding:32px;background:#171e1b;color:#e9dfc7;font:16px/1.6 system-ui,sans-serif}#startup-screen h1{font:32px Georgia,serif;margin:0}#startup-screen p{max-width:540px;margin:0;color:#b9bea8}#startup-screen button{justify-self:start;padding:10px 20px;border:1px solid #b79d69;border-radius:8px;background:#2d342b;color:#e9dfc7;font:inherit;cursor:pointer}#startup-screen small{color:#b9bea8}#startup-screen [hidden]{display:none}
+</style></head><body>
+<section id="startup-screen" role="status"><h1 id="startup-title">Opening Misaki…</h1><p id="startup-detail">Preparing your companion and garden.</p><button id="startup-retry" type="button" hidden>Reload interface</button><small id="startup-code" hidden></small></section>
+<div id="root"></div><script src="/startup.js"></script><script type="module" src="/src/main.tsx"></script></body></html>
