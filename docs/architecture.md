@@ -42,7 +42,7 @@ Runtime connections:
 | Python bridge | generativelanguage.googleapis.com:443 | Explicit Gemini discovery and chat |
 | Python bridge | api.x.ai:443 | Explicit Grok discovery and chat |
 
-User-initiated Ollama download links/commands contact external hosts. npm/Python dependency installation also uses external registries. No telemetry, update service, remote font, analytics, microphone, screenshot service or auto-download exists in the application.
+User-initiated Ollama download links/commands contact external hosts. npm/Python dependency installation also uses external registries. No telemetry, update service, remote font, analytics, microphone or background screenshot service exists in the application. Screen images are captured only by explicit user selection and uploaded only with the next message. The explicit setup:media command downloads a pinned checksum-verified mpv player.
 
 ## Cancellation and failure handling
 
@@ -58,3 +58,10 @@ Packaged sidecar startup, credential lifecycle, configurable hotkeys, encrypted 
 
 
 Cloud keys may optionally come from the root `.env` file or process environment. Only the Python bridge reads those credentials; background startup discovery reports key presence/source/loading/error but never a value. UI-only key entry remains session-only. Session disconnect does not edit `.env`, and tests isolate their factories and launcher environments from real saved keys. See [provider setup](providers.md).
+
+
+## Desktop Agent — controlled media and one-shot vision
+
+`electron/desktop-agent.mjs` owns native tool dispatch. File actions, mpv media operations and screen/window grants are separate adapters. Mutating tools serialize through the agent; reads use correlated bounded IPC. Preload exposes named capabilities, and every handler still verifies the owner main frame and exact origin. Media uses a private named pipe with a supervised player process; no arbitrary mpv command crosses the preload boundary.
+
+The selected music-folder path is saved in the Electron profile, revalidated/reindexed at startup and bounded before entering model context. The persistent renderer awareness setting can suppress playback and matching-file observations. Captured JPEG bytes remain ephemeral; a one-shot attachment enters only the current provider request, is consumed on send, and is excluded from persisted messages/exports. Changing provider or revoking sharing invalidates pending captures and expiring window-focus grants. The bridge rejects non-vision models and never falls back to another provider. Screenshot text is untrusted content, not permission to act. Mouse and keyboard injection are outside this phase. See [the Desktop Agent contract](electron-desktop.md).

@@ -1,5 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { validAction, type DesktopAction } from '../app/electron';
+import { validAction, type DesktopAction, type ScreenImage } from '../app/electron';
 
 export type Provider = 'local' | 'gemini' | 'grok';
 export type CloudProvider = Exclude<Provider, 'local'>;
@@ -63,7 +63,7 @@ export async function getHealth(signal?: AbortSignal): Promise<Health> {
   return data;
 }
 
-export async function chat(input: { request_id: string; conversation_id: string; message: string; model: string; mode: Provider; history: Turn[]; desktop?: boolean }, signal: AbortSignal): Promise<ChatReply> {
+export async function chat(input: { request_id: string; conversation_id: string; message: string; model: string; mode: Provider; history: Turn[]; desktop?: boolean; screen?: ScreenImage; desktop_context?: string }, signal: AbortSignal): Promise<ChatReply> {
   const data = await request('/v1/chat', 'POST', input, signal) as ChatReply;
   if (data.request_id !== input.request_id || typeof data.reply !== 'string' || data.route !== input.mode || data.status !== 'ok') throw new ApiError('The bridge returned an invalid reply.');
   if (data.actions !== undefined && (!Array.isArray(data.actions) || data.actions.length > 3 || !data.actions.every(validAction))) throw new ApiError('The model returned invalid desktop actions.');

@@ -49,6 +49,10 @@ npm run desktop
 
 Electron opens the same Japanese garden, avatar, model selector and chat in a resizable desktop window. No Rust or C++ build tools are needed. Each new desktop launch builds the interface, then supervises the Python bridge, a loopback server for the built UI, and Electron together; closing the desktop window stops its servers. Ctrl+Shift+M restores/focuses the window. Always-on-top is available in Preferences.
 
+**Desktop Agent:** open **Desktop tools** in chat to choose a music folder and use play/pause/resume, next/previous, stop and player volume. Ask for songs by name after choosing a folder; approve model-proposed actions in chat. The folder is remembered. **Share screen** lets you preview one screen/window snapshot and send it once with your next message to Gemini or another vision-capable model. Screenshots are never stored in app history. Window focus is scoped to an explicitly shared window; click/typing automation is a later phase. See [setup, controls and privacy](docs/electron-desktop.md).
+
+The portable mpv player is installed on this computer. For a fresh Windows x64 checkout, run `npm run setup:media` once. It installs a checksum-verified player under `.cache/mpv` without changing your default applications.
+
 Running `npm run desktop` again brings the existing desktop window forward and preserves its provider connections and conversation. The desktop uses the built UI; `npm run dev` retains Vite live editing. A loading screen and Reload interface recovery replace unexplained blank startup screens.
 
 Ask any selected Local, Gemini or Grok model:
@@ -72,7 +76,7 @@ Documents, images, videos and audio can open in their Windows default applicatio
 - Chat through Ollama, Gemini or Grok, with per-request IDs, provider-specific context, cancellation, timeout, readable errors and retry.
 - Local model selection, cloud model discovery with your own session keys or automatically loaded `.env` keys, key removal, and connection guidance. Ollama cloud aliases remain blocked; cloud inference uses an explicitly selected provider.
 - Settings, compact preview, history disabled by default, opt-in device history, clear and text export.
-- Text rendered as plain text, with separately validated desktop action proposals and explicit native target review.
+- Text rendered as plain text, with separately validated desktop action proposals and explicit native target review. Controlled local music playback, chosen-folder song lookup and opt-in one-shot vision attachments are available through the Desktop Agent.
 - Independently testable bridge; LocalMind-compatible `/v1` contract without modifying existing LocalMind code.
 
 **Still to build:** local voice and push-to-talk; LocalMind RAG/citations and memory; sidecar supervision and installer; native performance/DPI/monitor validation. The supplied Live2D model is integrated for this local project; distribution rights still need review. No fake model replies are used in the application.

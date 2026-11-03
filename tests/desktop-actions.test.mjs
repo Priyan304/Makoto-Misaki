@@ -34,7 +34,7 @@ test('desktop boundary rejects commands, URI handlers, credentials and oversized
   assert.equal(website('https://example.com'), 'https://example.com/');
 });
 
-test('chat-approved actions open directly, validate actual files and report default-player results', async () => {
+test('chat-approved file actions open directly and validate actual files', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'misaki-actions-'));
   const opened = [];
   let selected = path.join(root, 'song.mp3');
@@ -51,10 +51,9 @@ test('chat-approved actions open directly, validate actual files and report defa
     await mkdir(path.join(root, 'folder'));
     assert.equal((await execute({ type: 'open_folder', target: 'downloads' })).status, 'completed');
     assert.equal(opened.length, 1);
-    assert.equal((await execute({ type: 'play_music', target: selected })).status, 'completed');
-    assert.match((await execute({ type: 'play_music', target: '' })).message, /default music player/);
+    assert.equal((await execute({ type: 'open_file', target: selected })).status, 'completed');
+    await assert.rejects(execute({ type: 'play_music', target: '' }), /Desktop Agent/);
     await assert.rejects(execute({ type: 'open_file', target: path.join(root, 'program.exe') }), /Programs and scripts/);
-    await assert.rejects(execute({ type: 'play_music', target: path.join(root, 'program.exe') }), /Programs and scripts/);
     await assert.rejects(execute({ type: 'open_file', target: path.join(root, 'missing.txt') }), /does not exist/);
     await assert.rejects(execute({ type: 'open_file', target: 'relative.txt' }), /absolute path/);
     await assert.rejects(execute({ type: 'open_file', target: '\\\\server\\file.txt' }), /absolute path/);
@@ -66,10 +65,10 @@ test('chat-approved actions open directly, validate actual files and report defa
     selected = path.join(root, 'program.exe');
     await assert.rejects(execute({ type: 'open_file', target: '' }), /Programs and scripts/);
     pickerCancelled = true;
-    assert.equal((await execute({ type: 'play_music', target: '' })).status, 'cancelled');
+    assert.equal((await execute({ type: 'open_file', target: '' })).status, 'cancelled');
     pickerCancelled = false;
     selected = path.join(root, 'song.mp3');
-    assert.equal((await execute({ type: 'play_music', target: '' })).status, 'completed');
+    assert.equal((await execute({ type: 'open_file', target: '' })).status, 'completed');
     assert.equal((await execute({ type: 'open_website', target: 'https://example.com' })).status, 'completed');
     failure = 'No handler';
     await assert.rejects(execute({ type: 'open_file', target: path.join(root, 'song.mp3') }), /default application/);

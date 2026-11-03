@@ -21,7 +21,7 @@ const server = createServer(async (request, response) => {
       let body = Buffer.alloc(0);
       for await (const chunk of request) {
         body = Buffer.concat([body, chunk]);
-        if (body.length > 65536) { response.writeHead(413); response.end(JSON.stringify({ detail: 'Request too large' })); return; }
+        if (body.length > (route === '/v1/chat' ? 2097152 : 65536)) { response.writeHead(413); response.end(JSON.stringify({ detail: 'Request too large' })); return; }
       }
       const upstream = await fetch(`http://127.0.0.1:${bridgePort}${route}`, { method: request.method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: request.method === 'POST' ? body : undefined, redirect: 'error', signal: AbortSignal.timeout(130000) });
       response.writeHead(upstream.status); response.end(await upstream.text());

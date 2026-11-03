@@ -8,6 +8,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:ui": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "desktop": "node scripts/dev.mjs --desktop",
+    "setup:media": "node --use-system-ca scripts/setup-media.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:backend": "node scripts/test-backend.mjs",
@@ -16,7 +17,7 @@
     "smoke:local": "node scripts/smoke-local.mjs",
     "check": "npm run build && npm test && npm run test:backend",
     "tauri": "tauri",
-    "test:desktop": "npm run build && node --test tests/desktop-actions.test.mjs && node tests/electron-smoke.mjs"
+    "test:desktop": "npm run build && node --test tests/desktop-actions.test.mjs tests/desktop-agent.test.mjs && node tests/electron-smoke.mjs"
   },
   "dependencies": {
     "@pixi/unsafe-eval": "^6.5.10",

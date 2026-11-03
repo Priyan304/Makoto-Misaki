@@ -41,7 +41,9 @@ const bridge = createHttpServer(async (request, response) => {
 });
 let desktop;
 try {
-  await writeFile(path.join(root, 'sample.mp3'), 'test audio fixture');
+  const pcm = Buffer.alloc(44 + 16000 * 60);
+  pcm.write('RIFF'); pcm.writeUInt32LE(pcm.length - 8, 4); pcm.write('WAVEfmt ', 8); pcm.writeUInt32LE(16, 16); pcm.writeUInt16LE(1, 20); pcm.writeUInt16LE(1, 22); pcm.writeUInt32LE(8000, 24); pcm.writeUInt32LE(16000, 28); pcm.writeUInt16LE(2, 32); pcm.writeUInt16LE(16, 34); pcm.write('data', 36); pcm.writeUInt32LE(pcm.length - 44, 40);
+  await writeFile(path.join(root, 'sample.wav'), pcm);
   await new Promise(resolve => bridge.listen(0, '127.0.0.1', resolve));
   const bridgePort = bridge.address().port;
   const { ELECTRON_RUN_AS_NODE: _ignored, ...env } = process.env;
@@ -61,7 +63,7 @@ try {
     globalThis.testCalls = []; globalThis.opened = []; globalThis.pickerCancelled = false; globalThis.openError = '';
     globalThis.nativeOpenPath = shell.openPath;
     dialog.showMessageBox = async (_window, options) => { globalThis.testCalls.push({ kind: 'confirmation', detail: options.detail }); return { response: 0 }; };
-    dialog.showOpenDialog = async () => ({ canceled: globalThis.pickerCancelled, filePaths: [folder + '/sample.mp3'] });
+    dialog.showOpenDialog = async () => ({ canceled: globalThis.pickerCancelled, filePaths: [folder + '/sample.wav'] });
     shell.openPath = async value => { if (globalThis.openError) return globalThis.openError; globalThis.opened.push(value); return ''; };
     shell.openExternal = async value => { globalThis.opened.push(value); };
   }, root);
@@ -96,7 +98,7 @@ try {
   const beforeRetry = backendCalls.filter(value => value.path === '/v1/chat').length;
   await desktop.evaluate(() => { globalThis.pickerCancelled = false; });
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await page.getByText('Desktop result: Opened sample.mp3 in your default music player.', { exact: true }).waitFor();
+  await page.getByText('Desktop result: Media playing: sample.wav. Volume 60%.', { exact: true }).waitFor();
   assert.equal(backendCalls.filter(value => value.path === '/v1/chat').length, beforeRetry);
   // A default-app error must also allow retry without regenerating the action.
   await desktop.evaluate(() => { globalThis.openError = 'Fixture default application failure'; });
@@ -132,7 +134,7 @@ try {
     await page.getByRole('textbox', { name: 'Message Misaki' }).fill('Play music');
     await page.getByRole('button', { name: 'Send message' }).click();
     await page.getByRole('button', { name: 'Choose music', exact: true }).click();
-    await page.getByText('Desktop result: Opened sample.mp3 in your default music player.', { exact: true }).waitFor();
+    await page.getByText('Desktop result: Media playing: sample.wav. Volume 60%.', { exact: true }).waitFor();
     await page.getByRole('textbox', { name: 'Message Misaki' }).fill('Thank you');
     await page.getByRole('button', { name: 'Send message' }).click();
     await page.locator('.message.assistant').nth(2).waitFor();
@@ -140,9 +142,49 @@ try {
   const calls = backendCalls.filter(value => value.body?.message);
   assert.ok(calls.every(value => value.body.desktop === true));
   assert.ok(calls.every(value => value.authorization === 'Bearer electron-test-session-not-a-real-credential'));
-  for (const provider of ['local', 'gemini', 'grok']) assert.ok(calls.some(value => value.body.mode === provider && value.body.history.some(turn => turn.content.startsWith('Desktop result: Opened'))));
-  assert.equal(await desktop.evaluate(() => globalThis.opened.length), 6);
+  for (const provider of ['local', 'gemini', 'grok']) assert.ok(calls.some(value => value.body.mode === provider && value.body.history.some(turn => turn.content.startsWith('Desktop result: Media'))));
+  assert.equal(await desktop.evaluate(() => globalThis.opened.length), 2);
   assert.equal(await desktop.evaluate(() => globalThis.testCalls.length), 0);
+  // Test the real sandboxed screenshot IPC with a repository-image fixture.
+  // No personal screen capture or live cloud inference occurs in this suite.
+  await desktop.evaluate(({ desktopCapturer, nativeImage }, imagePath) => {
+    globalThis.screenCaptures = 0;
+    const thumbnail = nativeImage.createFromPath(imagePath).resize({ width: 320 });
+    desktopCapturer.getSources = async () => { globalThis.screenCaptures++; return [{ id: 'window:4242:0', name: 'Test Editor', thumbnail }]; };
+  }, path.resolve('public/scenes/old-kyoto-garden.png'));
+  await assert.rejects(page.evaluate(() => window.misakiDesktop.captureScreen('window:4242:0')), /picker first/);
+  assert.equal(await desktop.evaluate(() => globalThis.screenCaptures), 0);
+  await page.getByRole('button', { name: 'Share screen', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Share a screen or window' }).waitFor();
+  await page.getByRole('button', { name: 'Test Editor Application window' }).click();
+  await expect(page.getByAltText('Screenshot preview: Test Editor')).toBeVisible();
+  const beforeImage = backendCalls.filter(value => value.path === '/v1/chat').length;
+  assert.equal(await desktop.evaluate(() => globalThis.screenCaptures), 2);
+  const composer = page.getByRole('textbox', { name: 'Message Misaki' });
+  await composer.fill('What is on this screen?'); await composer.press('Enter');
+  await expect(composer).toBeEnabled();
+  const imageCall = backendCalls.filter(value => value.path === '/v1/chat')[beforeImage];
+  assert.equal(imageCall.body.screen.mime_type, 'image/jpeg');
+  assert.equal(imageCall.body.screen.source, 'Test Editor');
+  assert.ok(imageCall.body.screen.data.length > 100);
+  assert.equal(imageCall.body.screen.window, undefined);
+  assert.ok(!JSON.stringify(imageCall.body.history).includes(imageCall.body.screen.data));
+  const grant = JSON.parse(imageCall.body.desktop_context).window.token;
+  await page.evaluate(() => window.misakiDesktop.stopSharing());
+  await assert.rejects(page.evaluate(token => window.misakiDesktop.action({ type: 'focus_window', target: token }), grant), /expired/);
+  await composer.fill('Thank you for looking'); await composer.press('Enter');
+  await expect(composer).toBeEnabled();
+  assert.equal(backendCalls.filter(value => value.path === '/v1/chat').at(-1).body.screen, undefined);
+  await page.getByRole('button', { name: 'Desktop tools', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause music', exact: true }).click();
+  await expect(page.locator('.desktop-tools-panel').getByRole('status')).toContainText('paused · sample.wav');
+  await page.getByRole('button', { name: 'Resume music', exact: true }).click();
+  await page.getByLabel('Playback volume').selectOption('30');
+  await page.getByRole('button', { name: 'Stop music', exact: true }).click();
+  assert.equal((await page.evaluate(() => window.misakiDesktop.mediaStatus())).state, 'stopped');
+  await mkdir('test-results', { recursive: true });
+  await page.screenshot({ path: 'test-results/electron-desktop-agent.png' });
+  await page.getByRole('button', { name: 'Desktop tools', exact: true }).click();
   // A second window with the same preload still cannot invoke privileged IPC.
   const blocked = await desktop.evaluate(async ({ BrowserWindow }, preload) => {
     const main = BrowserWindow.getAllWindows()[0];

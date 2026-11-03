@@ -39,3 +39,7 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+## Optional portable mpv runtime
+
+`npm run setup:media` downloads a pinned first-party mpv CI build from [mpv-player/mpv](https://github.com/mpv-player/mpv/releases/tag/git-release) into the ignored `.cache/mpv` directory and verifies its published SHA-256. Archive identity and hash are recorded in `provenance.json` there. This runtime is not embedded in the frontend or installer. mpv and its bundled FFmpeg/other components retain their upstream licenses; see [mpv copyright and licensing](https://github.com/mpv-player/mpv/blob/master/Copyright) and the corresponding build/source notices.
