@@ -1,7 +1,8 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, globalShortcut } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, globalShortcut, desktopCapturer } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createActions, website } from './actions.mjs';
+import { website } from './actions.mjs';
+import { createDesktopAgent } from './desktop-agent.mjs';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { watchLauncher } from './launcher-lifecycle.mjs';
 
@@ -62,7 +63,9 @@ else {
         callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [`default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws://127.0.0.1:${port}; object-src 'none'; frame-src 'none'; base-uri 'self'`] } });
       } else callback({});
     });
-    const execute = createActions({ app, dialog, shell, owner: () => win });
+    const agent = createDesktopAgent({ app, dialog, shell, desktopCapturer, owner: () => win });
+    app.once('will-quit', () => agent.close());
+    win.webContents.on('did-start-navigation', (_event, _url, _inPlace, mainFrame) => { if (mainFrame) agent.stopSharing(); });
     let interfaceReady = false;
     handle('misaki:interface', state => {
       if (!['ready', 'error'].includes(state)) throw new Error('Invalid interface state');
@@ -82,13 +85,20 @@ else {
       console.error(`Misaki renderer stopped (${details.reason}).`);
       dialog.showMessageBox(win, { type: 'error', title: 'Misaki interface stopped', message: 'The interface stopped responding.', detail: 'Reload the interface to try again.', buttons: ['Reload interface', 'Close Misaki'], defaultId: 0, cancelId: 1 }).then(({ response }) => { if (win.isDestroyed()) return; if (response === 0) void win.loadURL(origin); else win.close(); }).catch(() => {});
     });
-    handle('misaki:action', execute);
+    handle('misaki:action', agent.action);
+    handle('misaki:media-status', agent.status);
+    handle('misaki:media-library', agent.chooseLibrary);
+    handle('misaki:media-search', agent.search);
+    handle('misaki:desktop-context', agent.context);
+    handle('misaki:screen-sources', agent.sources);
+    handle('misaki:screen-capture', agent.capture);
+    handle('misaki:screen-stop', agent.stopSharing);
     handle('misaki:top', value => { if (typeof value !== 'boolean') throw new Error('Invalid window option'); win.setAlwaysOnTop(value); });
     handle('misaki:backend', async value => {
       const method = value?.method;
       const route = value?.path;
       const allowed = (method === 'GET' && ['/v1/health', '/v1/providers'].includes(route)) || (['POST', 'DELETE'].includes(method) && /^\/v1\/providers\/(gemini|grok)$/.test(route)) || (method === 'POST' && (route === '/v1/chat' || /^\/v1\/chat\/[a-f0-9-]{36}\/cancel$/.test(route)));
-      if (!allowed || (value.body !== undefined && JSON.stringify(value.body).length > 65536)) throw new Error('Unsupported bridge request');
+      if (!allowed || (value.body !== undefined && Buffer.byteLength(JSON.stringify(value.body)) > (route === '/v1/chat' ? 2097152 : 65536))) throw new Error('Unsupported bridge request');
       try {
         const response = await fetch(`http://127.0.0.1:${bridgePort}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: method === 'POST' ? JSON.stringify(value.body ?? {}) : undefined, signal: AbortSignal.timeout(130000), redirect: 'error' });
         try { return { status: response.status, body: await response.json() }; }

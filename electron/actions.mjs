@@ -1,13 +1,17 @@
 import path from 'node:path';
 import { realpath, stat } from 'node:fs/promises';
+import { mediaTypes } from './media.mjs';
 
 const documents = new Set(['.txt', '.md', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.ppt', '.pptx', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac', '.mp4', '.mkv', '.webm']);
 const audio = new Set(['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac']);
-const types = new Set(['open_file', 'open_folder', 'play_music', 'open_website', 'reveal_file']);
+const types = new Set(['open_file', 'open_folder', 'open_website', 'reveal_file', 'focus_window', ...mediaTypes]);
 const folders = new Set(['home', 'desktop', 'documents', 'downloads', 'music', 'pictures', 'videos']);
 
 export function validateAction(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['type', 'target'].includes(key)) || !types.has(value.type) || typeof value.target !== 'string' || value.target.length > 2048 || /[\x00-\x1f]/.test(value.target)) throw new Error('Unsupported desktop action.');
+  if (['pause_media', 'resume_media', 'stop_media', 'next_track', 'previous_track', 'get_playback_status'].includes(value.type) && value.target !== '') throw new Error('This media control takes no target.');
+  if (value.type === 'set_volume' && (!/^\d{1,3}$/.test(value.target) || Number(value.target) > 100)) throw new Error('Volume must be between 0 and 100.');
+  if (value.type === 'focus_window' && !/^[a-f0-9-]{36}$/.test(value.target)) throw new Error('Choose a shared window first.');
   return { type: value.type, target: value.target.trim() };
 }
 
@@ -23,6 +27,7 @@ export function createActions({ app, dialog, shell, owner }) {
   return async raw => {
     if (running) throw new Error('Finish the current desktop action first.');
     const action = validateAction(raw);
+    if (!['open_file', 'open_folder', 'open_website', 'reveal_file'].includes(action.type)) throw new Error('Use the Desktop Agent for this action.');
     running = true;
     try {
       let target = action.target;
