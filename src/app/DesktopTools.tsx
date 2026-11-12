@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, FolderOpen, Music2, Pause, Play, SkipBack, SkipForward, Square, X } from 'lucide-react';
+import { Camera, FolderOpen, ListMusic, Music2, Pause, Play, SkipBack, SkipForward, Square, X } from 'lucide-react';
 import { desktopError, type DesktopAction, type MediaStatus, type ScreenImage, type ScreenSource, type Track } from './electron';
+import MusicPlaylist from './MusicPlaylist';
 
-export default function DesktopTools({ provider, busy, screen, onScreen, onStop, onResult, awareness, onAwareness }: { provider: string; busy: boolean; screen: ScreenImage | null; onScreen: (image: ScreenImage) => void; onStop: () => void; onResult: (message: string) => void; awareness: boolean; onAwareness: (value: boolean) => void }) {
+export default function DesktopTools({ provider, busy, screen, onScreen, onStop, onResult, awareness, onAwareness, playlistOpen, onPlaylistOpen, compact }: { provider: string; busy: boolean; screen: ScreenImage | null; onScreen: (image: ScreenImage) => void; onStop: () => void; onResult: (message: string) => void; awareness: boolean; onAwareness: (value: boolean) => void; playlistOpen: boolean; onPlaylistOpen: (value: boolean) => void; compact: boolean }) {
   const api = window.misakiDesktop;
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<MediaStatus | null>(null);
@@ -16,19 +17,20 @@ export default function DesktopTools({ provider, busy, screen, onScreen, onStop,
   const epoch = useRef(0);
   const picker = useRef<HTMLElement>(null);
   const lock = useRef(false);
+  useEffect(() => { if (playlistOpen) { setOpen(false); setQuery(''); } }, [playlistOpen]);
   useEffect(() => {
-    if (!api || !open) return;
+    if (!api || (!open && !playlistOpen)) return;
     let active = true;
-    const refresh = () => { if (!document.hidden) void api.mediaStatus().then(value => { if (active) setStatus(value); }).catch(() => {}); };
+    const refresh = () => { if (!document.hidden) void api.mediaStatus().then(value => { if (active) setStatus(value); }).catch(failure => { if (active) setError(desktopError(failure)); }); };
     refresh(); const timer = setInterval(refresh, 2000);
     return () => { active = false; clearInterval(timer); };
-  }, [api, open]);
+  }, [api, open, playlistOpen]);
   useEffect(() => {
-    if (!api || !open) return;
+    if (!api || (!open && !playlistOpen)) return;
     let active = true;
-    const timer = setTimeout(() => { void api.searchMedia(query).then(value => { if (active) setMatches(value); }).catch(() => {}); }, 200);
+    const timer = setTimeout(() => { void api.searchMedia(query).then(value => { if (active) setMatches(value); }).catch(failure => { if (active) setError(desktopError(failure)); }); }, 200);
     return () => { active = false; clearTimeout(timer); };
-  }, [api, open, query, status?.library, status?.trackCount]);
+  }, [api, open, playlistOpen, query, status?.library, status?.trackCount]);
   useEffect(() => () => { epoch.current++; }, []);
   useEffect(() => { epoch.current++; setSources(null); setPicking(false); }, [provider]);
   useEffect(() => {
@@ -68,7 +70,8 @@ export default function DesktopTools({ provider, busy, screen, onScreen, onStop,
   }
   if (!api) return null;
   return <div className="desktop-tools">
-    <div className="desktop-toolbar"><button type="button" className="desktop-tool-button" aria-expanded={open} onClick={() => setOpen(value => !value)}><Music2 size={14}/>Desktop tools</button><button type="button" className="desktop-tool-button" disabled={busy || picking || !!screen} onClick={() => void pickScreen()}><Camera size={14}/>{picking ? 'Preparing…' : 'Share screen'}</button></div>
+    <div className="desktop-toolbar"><button type="button" className="desktop-tool-button" aria-expanded={playlistOpen} onClick={() => onPlaylistOpen(!playlistOpen)}><ListMusic size={14}/>Playlist</button><button type="button" className="desktop-tool-button" aria-expanded={open} onClick={() => { if (!open) onPlaylistOpen(false); setOpen(value => !value); }}><Music2 size={14}/>Desktop tools</button><button type="button" className="desktop-tool-button" disabled={busy || picking || !!screen} onClick={() => void pickScreen()}><Camera size={14}/>{picking ? 'Preparing…' : 'Share screen'}</button></div>
+    {playlistOpen && createPortal(<MusicPlaylist status={status} working={working} error={error} query={query} matches={matches} compact={compact} onQuery={setQuery} onAction={action => void execute(action)} onChooseLibrary={() => void chooseLibrary()} onClose={() => onPlaylistOpen(false)}/>, document.body)}
     {open && <div className="desktop-tools-panel">
       <strong>Misaki’s music player</strong><p role="status">{status ? `${status.available ? status.state : 'Player unavailable'}${status.title ? ` · ${status.title}` : ''}` : 'Checking player…'}</p>
       {status && !status.available && <p>Run <code>npm run setup:media</code> once to install the portable player.</p>}
@@ -87,7 +90,7 @@ export default function DesktopTools({ provider, busy, screen, onScreen, onStop,
       {status?.error && <p role="alert">{status.error}</p>}
     </div>}
     {screen && <div className="screen-attachment"><img src={`data:${screen.mime_type};base64,${screen.data}`} alt={`Screenshot preview: ${screen.source}`}/><div><strong>Screenshot ready · {screen.source}</strong><p>Sent once to {provider} with your next message. Remove to stop sharing.</p></div><button type="button" aria-label="Remove screenshot and stop sharing" onClick={onStop}><X size={15}/></button></div>}
-    {error && <p className="desktop-tool-error" role="alert">{error}</p>}
+    {error && !playlistOpen && <p className="desktop-tool-error" role="alert">{error}</p>}
     {sources && createPortal(<div className="screen-picker-backdrop" onClick={cancelPicker}><section ref={picker} role="dialog" aria-modal="true" aria-label="Share a screen or window" className="screen-picker" onClick={event => event.stopPropagation()} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); cancelPicker(); }
       if (event.key === 'Tab') {
         const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled])'));

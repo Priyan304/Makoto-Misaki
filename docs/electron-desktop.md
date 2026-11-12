@@ -40,6 +40,8 @@ The renderer uses a sandbox with context isolation, no Node integration, no webv
 
 ## Music setup and use
 
+Asking Misaki to play or find music opens a semi-transparent playlist on the left when the model returns its music proposal. The panel shows the current track, playback progress and queue, with clickable tracks, pause/resume, previous/next and volume. Use **Browse library** to search the chosen music folder. Closing the panel keeps playback running; the **Playlist** button beside the composer opens it again. The centered avatar and right-hand chat keep their positions on wide screens. Narrow windows use a dismissible left overlay.
+
 The portable player is installed locally in `.cache/mpv` on this computer. A fresh Windows x64 checkout can install the same pinned first-party CI build with:
 
 ```powershell
