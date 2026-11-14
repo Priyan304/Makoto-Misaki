@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { validAction, type DesktopAction, type ScreenImage } from '../app/electron';
+import { isEmotion, type Emotion } from '../live2d/behavior';
 
 export type Provider = 'local' | 'gemini' | 'grok';
 export type CloudProvider = Exclude<Provider, 'local'>;
@@ -18,6 +19,7 @@ export interface ChatReply {
   request_id: string; reply: string; model: string; route: Provider; status: 'ok'; latency_ms: number;
   citations: { title: string; uri?: string }[];
   actions?: DesktopAction[];
+  emotion?: Emotion;
 }
 export class ApiError extends Error {}
 
@@ -67,6 +69,7 @@ export async function chat(input: { request_id: string; conversation_id: string;
   const data = await request('/v1/chat', 'POST', input, signal) as ChatReply;
   if (data.request_id !== input.request_id || typeof data.reply !== 'string' || data.route !== input.mode || data.status !== 'ok') throw new ApiError('The bridge returned an invalid reply.');
   if (data.actions !== undefined && (!Array.isArray(data.actions) || data.actions.length > 3 || !data.actions.every(validAction))) throw new ApiError('The model returned invalid desktop actions.');
+  if (!isEmotion(data.emotion)) data.emotion = undefined;
   return data;
 }
 

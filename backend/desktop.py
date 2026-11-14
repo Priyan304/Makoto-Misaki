@@ -1,12 +1,13 @@
 """Structured proposals only. OS actions are validated and approved by Electron."""
 import json
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator, field_validator
+from .emotions import Emotion, valid_emotion, unfence
 import re
 
 DESKTOP_PROMPT = '''
 The Electron desktop host is available. Return ONLY a JSON object:
-{"reply":"your conversational reply", "actions":[{"type":"open_file", "target":""}]}.
+{"reply":"your conversational reply", "emotion":"neutral", "actions":[{"type":"open_file", "target":""}]}.
 For ordinary conversation use an empty actions array. At most 3 actions.
 Available types: open_file (document/image/video), open_folder, play_media (local
 audio in Misaki's controllable mpv player; play_music is an alias),
@@ -61,18 +62,27 @@ class DesktopReply(BaseModel):
     model_config = ConfigDict(extra='forbid')
     reply: str = Field(min_length=1, max_length=16000)
     actions: list[DesktopAction] = Field(max_length=3)
+    emotion: Emotion | None = None
+
+    @field_validator('emotion', mode='before')
+    @classmethod
+    def normalize_emotion(cls, value):
+        return valid_emotion(value)
 
 
-def parse_desktop_reply(text: str):
-    value = text.strip()
-    if value.startswith('```') and value.endswith('```'):
-        value = value.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+def parse_desktop_response(text: str):
+    value = unfence(text)
     try:
         parsed = DesktopReply.model_validate(json.loads(value))
-        return parsed.reply, [action.model_dump() for action in parsed.actions]
+        return parsed.reply, [action.model_dump() for action in parsed.actions], parsed.emotion
     except (ValueError, ValidationError):
         # Plain chat remains usable with models that do not follow the schema.
         # Malformed action JSON never becomes an executable proposal.
         if value.startswith(('{', '[')):
-            return 'I could not prepare that desktop action. Please retry your request.', []
-        return text, []
+            return 'I could not prepare that desktop action. Please retry your request.', [], None
+        return text, [], None
+
+
+def parse_desktop_reply(text: str):
+    reply, actions, _ = parse_desktop_response(text)
+    return reply, actions

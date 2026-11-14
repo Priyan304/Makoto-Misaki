@@ -39,6 +39,8 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
                 return httpx.Response(200, json={'message': {'content': 'Internal reasoning from an older template.\n</think>\n\nHello, Priyadharshan.'}})
             if self.mode == 'desktop':
                 return httpx.Response(200, json={'message': {'content': '{"reply":"I can open Downloads.","actions":[{"type":"open_folder","target":"downloads"}]}'}})
+            if self.mode == 'emotion':
+                return httpx.Response(200, json={'message': {'content': '{"reply":"Congratulations!","emotion":"happy"}'}})
             return httpx.Response(200, json={'message': {'content': 'Hello, Priyadharshan.'}})
 
         self.app = create_app(TOKEN, httpx.MockTransport(ollama))
@@ -69,6 +71,14 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.get('/v1/health', headers={'Origin': 'https://evil.example'})
         self.assertEqual(response.status_code, 403)
         self.assertEqual(len(self.calls), 0)
+
+    async def test_local_avatar_reaction(self):
+        self.mode = 'emotion'
+        response = await self.client.post('/v1/chat', json=self.payload(message='I passed!'))
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['reply'], 'Congratulations!')
+        self.assertEqual(response.json()['emotion'], 'happy')
+        self.assertEqual(len([r for r in self.calls if r.url.path == '/api/chat']), 1)
 
     async def test_health_and_offline_recovery(self):
         response = await self.client.get('/v1/health')

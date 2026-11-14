@@ -6,22 +6,33 @@ import type { CompanionState } from '../companion/controller';
 import FallbackAvatar from './FallbackAvatar';
 import { loadCubismCore } from './runtime';
 import { expressionChoices, loadExpressions, type ExpressionId } from './expressions';
+import { AvatarBehavior, type Reaction } from './behavior';
 
-export default function Avatar({ state, reducedMotion, scale = 1 }: { state: CompanionState; reducedMotion: boolean; scale?: number }) {
+export default function Avatar({ state, reducedMotion, scale = 1, reaction }: { state: CompanionState; reducedMotion: boolean; scale?: number; reaction?: Reaction }) {
   const host = useRef<HTMLDivElement>(null);
-  const options = useRef({ state, reducedMotion, scale });
+  const options = useRef({ state, reducedMotion, scale, reaction });
   const refresh = useRef<() => void>(() => {});
   const selected = useRef<ExpressionId[]>([]);
   const [activeExpressions, setActiveExpressions] = useState<ExpressionId[]>([]);
+  const [automatic, setAutomatic] = useState(true);
+  const [manual, setManual] = useState(false);
   const [expressionsOpen, setExpressionsOpen] = useState(false);
   const [expressionError, setExpressionError] = useState('');
   const [expressionsReady, setExpressionsReady] = useState(false);
   selected.current = activeExpressions;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  options.current = { state, reducedMotion, scale };
+  options.current = { state, reducedMotion, scale, reaction: automatic && !manual ? reaction : undefined };
 
-  useEffect(() => { refresh.current(); }, [state, reducedMotion, scale]);
+  useEffect(() => { refresh.current(); }, [state, reducedMotion, scale, reaction, automatic, manual]);
   useEffect(() => { refresh.current(); }, [activeExpressions]);
+  useEffect(() => {
+    if (automatic) {
+      setManual(false);
+      // These are outfit/accessory choices, not emotions. Never change them
+      // automatically as a side effect of interpreting a chat message.
+      setActiveExpressions(previous => previous.filter(id => id === 'coat' || id === 'eye-cover'));
+    }
+  }, [reaction?.id, automatic]);
   useEffect(() => {
     const container = host.current!;
     let disposed = false;
@@ -97,6 +108,19 @@ export default function Avatar({ state, reducedMotion, scale = 1 }: { state: Com
       if (disposed) { model.destroy({ texture: true, baseTexture: true }); return; }
       const internal = model.internalModel as Cubism4InternalModel;
       const core = internal.coreModel;
+      const behavior = new AvatarBehavior();
+      let frame = behavior.update(0, options.current.state, options.current.reaction, isStill());
+      let frameDelta = 0;
+      const weights = new Map<ExpressionId, number>();
+      const indices = new Map<string, number>();
+      const setParameter = (id: string, value: number) => {
+        let index = indices.get(id);
+        if (index === undefined) { index = core.getParameterIndex(id); indices.set(id, index); }
+        // Cubism invents virtual indices for absent IDs. Animate only real rig
+        // parameters and respect the bounds authored into this particular model.
+        if (index < 0 || index >= core.getParameterCount()) return;
+        core.setParameterValueById(id, Math.max(core.getParameterMinimumValue(index), Math.min(core.getParameterMaximumValue(index), value)));
+      };
       if (internal.physics) {
         const evaluatePhysics = internal.physics.evaluate.bind(internal.physics);
         internal.physics.evaluate = (core, dt) => { if (!isStill()) evaluatePhysics(core, dt); };
@@ -107,37 +131,35 @@ export default function Avatar({ state, reducedMotion, scale = 1 }: { state: Com
         if (disposed) return;
         internal.on('beforeModelUpdate', () => {
           for (const choice of expressionChoices) {
-            if (!selected.current.includes(choice.id)) continue;
+            const target = selected.current.includes(choice.id) ? 1 : frame.expressions.includes(choice.id) ? frame.intensity : 0;
+            const previous = weights.get(choice.id) ?? 0;
+            const weight = isStill() ? target : previous + (target - previous) * (1 - Math.exp(-frameDelta / .25));
+            weights.set(choice.id, weight);
+            if (weight < .001) continue;
             for (const parameter of expressions.get(choice.id)!.Parameters) {
               const current = core.getParameterValueById(parameter.Id);
               const value = parameter.Blend === 'Overwrite' ? parameter.Value
                 : parameter.Blend === 'Multiply' ? current * parameter.Value : current + parameter.Value;
-              core.setParameterValueById(parameter.Id, value);
+              setParameter(parameter.Id, current + (value - current) * weight);
             }
           }
         });
         setExpressionsReady(true);
+        refresh.current();
       }).catch(error => {
         if (!disposed && !controller.signal.aborted) setExpressionError(error instanceof Error ? error.message : 'Expressions could not be loaded.');
       });
-      // The supplied EyeBlink group is empty; use the model's actual rig IDs.
-      internal.on('beforeMotionUpdate', () => {
-        const active = options.current.state;
-        const t = still ? 0 : elapsed / 1000;
-        const blinkPhase = t % 4.8;
-        const eyeOpen = !still && blinkPhase > 4.55 ? Math.min(1, Math.abs(blinkPhase - 4.675) / .1) : 1;
-        core.setParameterValueById('ParamEyeLOpen', eyeOpen);
-        core.setParameterValueById('ParamEyeROpen', eyeOpen);
-        core.setParameterValueById('ParamAngleX', still ? 0 : Math.sin(t * .65) * 3);
-        core.setParameterValueById('ParamAngleY', active === 'thinking' ? -5 : active === 'listening' ? 3 : 0);
-        core.setParameterValueById('ParamAngleZ', active === 'thinking' ? 5 : still ? 0 : Math.sin(t * .48) * 1.5);
-        core.setParameterValueById('ParamBodyAngleX', still ? 0 : Math.sin(t * .4));
-        core.setParameterValueById('ParamBrowLY', active === 'error' ? -.25 : 0);
-        core.setParameterValueById('ParamBrowRY', active === 'error' ? -.25 : 0);
-        core.setParameterValueById('ParamMouthOpenY', 0);
-      });
       const updateBreath = internal.breath.updateParameters.bind(internal.breath);
-      internal.breath.updateParameters = (core, dt) => { if (!isStill()) updateBreath(core, dt); };
+      // Apply poses after Cubism's breath (which also writes head angles), but
+      // before physics, so hair and clothing follow the new movement naturally.
+      internal.breath.updateParameters = (core, dt) => {
+        if (!isStill()) updateBreath(core, dt);
+        frameDelta = Math.max(0, Math.min(dt, .05));
+        frame = behavior.update(frameDelta, options.current.state, options.current.reaction, isStill());
+        for (const [id, value] of Object.entries(frame.parameters)) setParameter(id, value);
+        container.dataset.emotion = frame.emotion;
+        container.dataset.gesture = frame.action;
+      };
       app.stage.addChild(model);
       model.anchor.set(.5, 0);
       const width = internal.originalWidth;
@@ -207,6 +229,7 @@ export default function Avatar({ state, reducedMotion, scale = 1 }: { state: Com
   }, []);
 
   function toggleExpression(id: ExpressionId) {
+    if (id !== 'coat' && id !== 'eye-cover') setManual(true);
     setActiveExpressions(previous => previous.includes(id) ? previous.filter(value => value !== id) : [...previous, id]);
   }
 
@@ -216,11 +239,12 @@ export default function Avatar({ state, reducedMotion, scale = 1 }: { state: Com
     {status === 'error' && <><FallbackAvatar state={state} reducedMotion={reducedMotion} scale={scale}/><span className="avatar-loading" role="status">Avatar unavailable · showing fallback</span></>}
     {status === 'ready' && <div className="expression-controls">
       {expressionsOpen && <div className="expression-panel" role="group" aria-label="Avatar expressions">
-        <div className="expression-heading"><span>Make a little face</span><button type="button" onClick={() => setActiveExpressions([])} disabled={!activeExpressions.length} aria-label="Reset expressions"><RotateCcw size={12}/>Reset</button></div>
+        <div className="expression-heading"><span>Reactions & expressions</span><button type="button" onClick={() => { setActiveExpressions([]); setManual(false); }} disabled={!activeExpressions.length && !manual} aria-label="Reset expressions"><RotateCcw size={12}/>Reset</button></div>
+        <label className="automatic-expressions"><input type="checkbox" checked={automatic} onChange={event => setAutomatic(event.target.checked)}/><span>Automatic reactions<small>{automatic ? 'Follows your conversation. Manual faces last until your next message.' : 'Choose expressions below.'}</small></span></label>
         <div className="expression-grid">{expressionChoices.map(choice => <button type="button" key={choice.id} aria-pressed={activeExpressions.includes(choice.id)} disabled={!expressionsReady} onClick={() => toggleExpression(choice.id)}>{choice.label}<span>{activeExpressions.includes(choice.id) ? '✓' : '+'}</span></button>)}</div>
         {expressionError && <p role="status">{expressionError}</p>}
       </div>}
-      <button type="button" className="expression-trigger" aria-label="Avatar expressions" aria-expanded={expressionsOpen} onClick={() => setExpressionsOpen(value => !value)}><Smile size={15}/><span>{activeExpressions.length ? `${activeExpressions.length} expression${activeExpressions.length === 1 ? '' : 's'}` : 'Expressions'}</span><ChevronDown size={13}/></button>
+      <button type="button" className="expression-trigger" aria-label="Avatar expressions" aria-expanded={expressionsOpen} onClick={() => setExpressionsOpen(value => !value)}><Smile size={15}/><span>{automatic && !manual ? 'Auto expressions' : activeExpressions.length ? `${activeExpressions.length} expression${activeExpressions.length === 1 ? '' : 's'}` : 'Expressions'}</span><ChevronDown size={13}/></button>
     </div>}
   </>;
 }

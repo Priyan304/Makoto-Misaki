@@ -55,12 +55,14 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
                     raise
             if self.failure == 'malformed':
                 return httpx.Response(200, json={'unexpected': KEY})
-            desktop_text = '{"reply":"Choose music to play.","actions":[{"type":"play_music","target":""}]}'
+            desktop_text = '{"reply":"Choose music to play.","emotion":"happy","actions":[{"type":"play_music","target":""}]}'
+            if self.failure == 'emotion':
+                desktop_text = '{"reply":"I am here for you.","emotion":"concerned"}'
             if request.url.host == 'generativelanguage.googleapis.com':
-                return httpx.Response(200, json={'candidates': [{'content': {'parts': [{'text': 'hidden thought', 'thought': True}, {'text': desktop_text if self.failure == 'desktop' else 'Hello from Gemini.'}]}}]})
+                return httpx.Response(200, json={'candidates': [{'content': {'parts': [{'text': 'hidden thought', 'thought': True}, {'text': desktop_text if self.failure in ('desktop', 'emotion') else 'Hello from Gemini.'}]}}]})
             return httpx.Response(200, json={'output': [
                 {'type': 'reasoning', 'summary': [{'text': 'hidden thought'}]},
-                {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': desktop_text if self.failure == 'desktop' else 'Hello from Grok.'}]},
+                {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': desktop_text if self.failure in ('desktop', 'emotion') else 'Hello from Grok.'}]},
             ]})
 
         async def no_local(_request):
@@ -87,7 +89,21 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             response = await self.client.post('/v1/chat', json=self.payload(provider, desktop=True))
             self.assertEqual(response.status_code, 200, response.text)
             self.assertEqual(response.json()['reply'], 'Choose music to play.')
+            self.assertEqual(response.json()['emotion'], 'happy')
             self.assertEqual(response.json()['actions'], [{'type': 'play_music', 'target': ''}])
+
+    async def test_cloud_contextual_emotion_in_same_generation(self):
+        for provider in ['gemini', 'grok']:
+            await self.connect(provider)
+            self.failure = 'emotion'
+            before = len(self.calls)
+            response = await self.client.post('/v1/chat', json=self.payload(provider, message='It has been a difficult week.'))
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()['emotion'], 'concerned')
+            self.assertEqual(response.json()['reply'], 'I am here for you.')
+            self.assertEqual(response.json()['actions'], [])
+            self.assertEqual(len(self.calls) - before, 1)
+            self.assertIn('Choose an avatar reaction', self.calls[-1].content.decode())
 
     async def connect(self, provider='gemini'):
         response = await self.client.post(f'/v1/providers/{provider}', json={'api_key': KEY})

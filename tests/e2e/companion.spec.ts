@@ -163,6 +163,90 @@ test('Live2D honors reduced motion and falls back on missing model data', async 
   await expect(page.locator('.avatar svg')).toBeVisible();
 });
 
+test('idle gestures move the real rig, pause when hidden, and respect reduced motion', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.route('**/api/v1/health', route => route.fulfill({ json: ready }));
+  await page.goto('/');
+  const avatar = page.locator('.live2d-avatar');
+  const canvas = avatar.locator('canvas');
+  await expect(avatar).toHaveAttribute('data-status', 'ready', { timeout: 30000 });
+  await expect(avatar).toHaveAttribute('data-gesture', /look-around|head-tilt|nod|weight-shift|soft-smile/, { timeout: 10000 });
+  const first = await canvas.screenshot();
+  await page.waitForTimeout(600);
+  expect(changedPixels(first, await canvas.screenshot())).toBeGreaterThan(100);
+  // Simulate the Page Visibility event independently of headless focus behavior.
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  const paused = await canvas.screenshot();
+  await page.waitForTimeout(400);
+  expect(changedPixels(paused, await canvas.screenshot())).toBeLessThanOrEqual(2);
+  await page.evaluate(() => { delete (document as unknown as { hidden?: boolean }).hidden; document.dispatchEvent(new Event('visibilitychange')); });
+  await page.waitForTimeout(400);
+  expect(changedPixels(paused, await canvas.screenshot())).toBeGreaterThan(100);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(avatar).toHaveAttribute('data-gesture', 'rest');
+  const still = await canvas.screenshot();
+  await page.waitForTimeout(400);
+  expect(changedPixels(still, await canvas.screenshot())).toBeLessThanOrEqual(2);
+});
+
+test('chat changes the rendered expression automatically and manual faces yield to the next message', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.route('**/api/v1/health', route => route.fulfill({ json: ready }));
+  let emotion: unknown = 'affectionate';
+  const requests: unknown[] = [];
+  await page.route('**/api/v1/chat', async route => {
+    const data = route.request().postDataJSON(); requests.push(data);
+    await route.fulfill({ json: { request_id: data.request_id, reply: 'A contextual reply.', emotion, model: data.model, route: data.mode, status: 'ok', latency_ms: 1, citations: [] } });
+  });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const avatar = page.locator('.live2d-avatar');
+  const canvas = avatar.locator('canvas');
+  await expect(avatar).toHaveAttribute('data-status', 'ready', { timeout: 30000 });
+  const menu = page.getByRole('button', { name: 'Avatar expressions', exact: true });
+  await menu.click();
+  await expect(page.getByRole('checkbox', { name: 'Automatic reactions' })).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Blush', exact: false })).toBeEnabled();
+  await menu.click();
+  const neutral = await canvas.screenshot();
+  const input = page.getByRole('textbox', { name: 'Message Misaki' });
+  await input.fill('You mean a lot to me.'); await input.press('Enter');
+  await expect(input).toBeEnabled(); await input.blur();
+  await expect(avatar).toHaveAttribute('data-emotion', 'affectionate');
+  const affectionate = await canvas.screenshot();
+  expect(changedPixels(neutral, affectionate)).toBeGreaterThan(100);
+  await page.screenshot({ path: 'test-results/automatic-affection.png' });
+  emotion = 'concerned';
+  await input.fill('I got some difficult news.'); await input.press('Enter');
+  await expect(input).toBeEnabled(); await input.blur();
+  await expect(avatar).toHaveAttribute('data-emotion', 'concerned');
+  expect(changedPixels(affectionate, await canvas.screenshot())).toBeGreaterThan(100);
+  await page.screenshot({ path: 'test-results/automatic-concern.png' });
+  await menu.click();
+  const angry = page.getByRole('button', { name: 'Angry', exact: false });
+  await angry.click(); await expect(angry).toHaveAttribute('aria-pressed', 'true');
+  await menu.click();
+  emotion = 'happy';
+  await input.fill('Things worked out in the end!'); await input.press('Enter');
+  await expect(input).toBeEnabled(); await input.blur();
+  await expect(avatar).toHaveAttribute('data-emotion', 'happy');
+  await menu.click(); await expect(angry).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('checkbox', { name: 'Automatic reactions' }).uncheck();
+  await menu.click();
+  emotion = 'sad';
+  await input.fill('A test with automatic reactions disabled'); await input.press('Enter');
+  await expect(input).toBeEnabled(); await input.blur();
+  await expect(avatar).toHaveAttribute('data-emotion', 'neutral');
+  await menu.click(); await page.getByRole('checkbox', { name: 'Automatic reactions' }).check(); await menu.click();
+  emotion = { command: 'not-an-expression' };
+  await input.fill('Just a regular message.'); await input.press('Enter');
+  await expect(input).toBeEnabled(); await input.blur();
+  await expect(avatar).toHaveAttribute('data-emotion', 'neutral');
+  await expect(page.locator('.message.assistant')).toHaveCount(5);
+  expect(requests).toHaveLength(5);
+  expect(await page.evaluate(() => localStorage.getItem('misaki.history.v1'))).toBeNull();
+});
+
 test('all supplied expressions visibly apply, combine, and reset in the hip-up view', async ({ page }) => {
   test.setTimeout(60000);
   expect(expressionChoices.map(choice => choice.file).sort()).toEqual(readdirSync('public/models/changli/EXP3').filter(file => file.endsWith('.exp3.json')).sort());

@@ -72,7 +72,7 @@ Documents, images, videos and audio can open in their Windows default applicatio
 
 ## What works in this milestone
 
-- Supplied Changli Live2D character raised and framed from head to knees above the dialogue panel, with physics, breathing, blink, attention and thinking states; original watermark preserved. The Expressions menu offers all seven supplied expressions: heart eyes, blush, angry, white eyes, dark face, eye cover and coat on/off. Toggle several together or use Reset to return to neutral. Assets and runtime are served locally, with reduced-motion support and an SVG fallback if rendering fails.
+- Supplied Changli Live2D character with varied idle gestures, natural blinks, physics and automatic facial reactions chosen by the chat model. All seven supplied expressions remain optional manual overrides; outfit/accessory changes remain manual. The original watermark and portrait framing are preserved. Assets and runtime are served locally, with reduced-motion support and an SVG fallback if rendering fails. See [automatic avatar behavior](docs/avatar-behavior.md).
 - Chat through Ollama, Gemini or Grok, with per-request IDs, provider-specific context, cancellation, timeout, readable errors and retry.
 - Local model selection, cloud model discovery with your own session keys or automatically loaded `.env` keys, key removal, and connection guidance. Ollama cloud aliases remain blocked; cloud inference uses an explicitly selected provider.
 - Settings, compact preview, history disabled by default, opt-in device history, clear and text export.

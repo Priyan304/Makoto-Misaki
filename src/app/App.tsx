@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, Check, ChevronDown, CircleHelp, Code2, Coffee, Download, Ellipsis, Expand, Flower2, GripHorizontal, Heart, Leaf, LoaderCircle, LockKeyhole, Maximize2, MessageCircle, Minus, Monitor, Moon, Pin, PlugZap, RefreshCw, Settings2, ShieldCheck, Sparkles, Square, Terminal, Trash2, WifiOff, X } from 'lucide-react';
 import Avatar from '../live2d/Avatar';
+import { immediateEmotion, type Reaction } from '../live2d/behavior';
 import { stateLabels, transition } from '../companion/controller';
 import { cancelChat, chat, getHealth, getProviders, providerNames, type Provider, type ProviderStatus, type Health, type Turn } from '../api/client';
 import { DEFAULTS, readHistory, readSettings, saveHistory, writeSettings, type Message, type Settings } from './storage';
@@ -29,6 +30,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>(() => readHistory(initialSettings.rememberHistory));
   const [page, setPage] = useState<Page>('companion');
   const [state, dispatch] = useReducer(transition, 'idle');
+  const [reaction, setReaction] = useState<Reaction>();
   const [health, setHealth] = useState<Health | null>(null);
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [checking, setChecking] = useState(true);
@@ -121,7 +123,7 @@ export default function App() {
   function update<K extends keyof Settings>(key: K, value: Settings[K]) { setSettings(previous => ({ ...previous, [key]: value })); }
   function chooseProvider(provider: Provider) {
     if (busy) return;
-    update('provider', provider); setModelMenu(false); setError(''); dispatch('RESET');
+    update('provider', provider); setModelMenu(false); setError(''); setReaction(undefined); dispatch('RESET');
   }
   function chooseModel(model: string) {
     if (settings.provider === 'local') update('model', model);
@@ -145,6 +147,7 @@ export default function App() {
     while (context.reduce((sum, m) => sum + m.content.length, 0) > 24000 || context.some(m => m.content.length > 8000)) context = context.slice(1);
     setMessages(previous => [...previous, { id: userId, role: 'user', content, status: 'pending', time: Date.now(), provider: settings.provider }]);
     setDraft(''); setError(''); dispatch('SEND');
+    setReaction({ id: userId, emotion: immediateEmotion(content) });
     const timeout = setTimeout(() => {
       if (request.current?.id === id) { void cancelChat(id).catch(() => {}); controller.abort(new DOMException('Timed out', 'TimeoutError')); }
     }, 130000);
@@ -161,6 +164,7 @@ export default function App() {
       const response = await chat({ request_id: id, conversation_id: conversation.current, message: content, model: currentModel, mode: settings.provider, history: context, ...(electron ? { desktop: true } : {}), ...(image ? { screen: image } : {}), ...(observations ? { desktop_context: observations } : {}) }, controller.signal);
       if (!mounted.current || request.current?.id !== id || controller.signal.aborted) return;
       const replyId = crypto.randomUUID();
+      setReaction({ id: userId, emotion: response.emotion ?? immediateEmotion(content), phase: 'reply' });
       if (electron && response.actions?.length) {
         setProposals(previous => ({ ...previous, [replyId]: response.actions! }));
         if (response.actions.some(action => ['play_media', 'play_music', 'search_media', 'resume_media'].includes(action.type))) setPlaylistOpen(true);
@@ -169,6 +173,7 @@ export default function App() {
       dispatch('COMPLETE');
     } catch (err) {
       if (!mounted.current || request.current?.id !== id) return;
+      setReaction(undefined);
       setMessages(previous => previous.map(m => m.id === userId ? { ...m, status: 'failed' } : m));
       if (controller.signal.aborted && controller.signal.reason?.name !== 'TimeoutError') dispatch('CANCEL');
       else { setError(controller.signal.reason?.name === 'TimeoutError' ? 'The model took too long. Try a smaller model, or send a shorter message.' : err instanceof Error ? err.message : 'Something went wrong. Please retry.'); dispatch('FAIL'); }
@@ -178,12 +183,13 @@ export default function App() {
     const current = request.current;
     if (!current) return;
     request.current = null;
+    setReaction(undefined);
     current.controller.abort();
     void cancelChat(current.id).catch(() => setNotice('The bridge did not confirm cancellation. The UI has stopped waiting.'));
     setMessages(previous => previous.map(m => m.id === current.userId ? { ...m, status: 'failed' } : m));
     dispatch('CANCEL'); setNotice('Response stopped.');
   }
-  function clearChat() { if (request.current) cancel(); stopSharing(); setMessages([]); setProposals({}); conversation.current = crypto.randomUUID(); setError(''); dispatch('RESET'); setMoreMenu(false); setNotice('Conversation cleared from this device.'); }
+  function clearChat() { if (request.current) cancel(); stopSharing(); setMessages([]); setProposals({}); setReaction(undefined); conversation.current = crypto.randomUUID(); setError(''); dispatch('RESET'); setMoreMenu(false); setNotice('Conversation cleared from this device.'); }
   function exportChat() {
     const body = messages.map(m => `${m.role === 'user' ? 'You' : 'Misaki'} · ${new Date(m.time).toLocaleString()}\n${m.content}`).join('\n\n');
     const url = URL.createObjectURL(new Blob([body || 'No messages yet.'], { type: 'text/plain' }));
@@ -219,7 +225,7 @@ export default function App() {
     <div className="workspace">
       <header className="topbar"><div className="wordmark"><Flower2 size={22}/><strong>misaki<span> / </span></strong><span className="top-subtitle">a little company, a little magic.</span></div><div className="top-actions">{!compact && <span className="local-badge"><span/>LOCAL FIRST</span>}{compact && <button className="icon-button drag-handle" title="Drag companion" aria-label="Drag companion window" onPointerDown={() => void dragWindow().catch(() => setNotice('Could not move window.'))}><GripHorizontal size={18}/></button>}{compact && <button className="icon-button" aria-label="Preferences" title="Preferences" onClick={() => setPage(p => p === 'settings' ? 'companion' : 'settings')}><Settings2 size={16}/></button>}<button className="icon-button" title={compact ? 'Expand studio' : 'Preview desktop view'} aria-label={compact ? 'Expand studio' : 'Preview desktop view'} onClick={() => { if (native) setNotice('This is the desktop companion. Use preferences to customize it.'); else setCompact(v => !v); }}>{compact ? <Expand size={16}/> : <Maximize2 size={16}/>}</button></div></header>
       {page === 'companion' ? <main className="companion-page"><div className="page-heading"><div><div className="eyebrow">YOUR EVERYDAY COMPANION</div><h1>{greeting()}, <span>Priyadharshan.</span><span className="greeting-flower">✳</span></h1><p>A quiet corner, just for you and Misaki.</p></div><button className="button desktop-button" onClick={() => setCompact(true)}><Monitor size={16}/>Desktop view<ArrowRight size={14}/></button></div>
-        <div className="companion-grid"><section className={`presence-card ${!avatarVisible ? 'avatar-hidden' : ''}`} aria-label="Companion avatar"><div className="presence-top"><span className="character-label"><span/>MAKOTO MISAKI</span><button className={`icon-button ${settings.alwaysOnTop ? 'pinned' : ''}`} aria-label="Toggle always on top" title="Always on top" onClick={() => update('alwaysOnTop', !settings.alwaysOnTop)}><Pin size={16}/></button></div><div className="avatar-scene"><div className="scene-circle"/><div className="scene-orbit"/><span className="scene-star star-one">✧</span><span className="scene-star star-two">✦</span><span className="scene-star star-three">✧</span><span className="scene-caption">そばにいるよ</span>{avatarVisible ? <Avatar state={state} reducedMotion={settings.reducedMotion} scale={settings.scale}/> : <div className="hidden-state"><Moon size={35}/><p>Taking a little quiet time.</p><button className="button" onClick={() => setAvatarVisible(true)}>Show Misaki</button></div>}<div className="character-caption"><span>まこと みさき</span><h2>A little presence.<br />A softer kind of everyday.</h2></div></div><div className="presence-bottom"><div className={`state-pill ${busy ? 'thinking' : ''}`}><span/>{stateLabels[state]}</div><div><button className="icon-button" title={avatarVisible ? 'Hide avatar' : 'Show avatar'} aria-label={avatarVisible ? 'Hide avatar' : 'Show avatar'} onClick={() => { if (native) void hideWindow().catch(() => setNotice('Could not hide window.')); else setAvatarVisible(v => !v); }}><Minus size={18}/></button><button className="icon-button" title="Character preferences" aria-label="Character preferences" onClick={() => setPage('settings')}><Settings2 size={16}/></button></div></div></section>
+        <div className="companion-grid"><section className={`presence-card ${!avatarVisible ? 'avatar-hidden' : ''}`} aria-label="Companion avatar"><div className="presence-top"><span className="character-label"><span/>MAKOTO MISAKI</span><button className={`icon-button ${settings.alwaysOnTop ? 'pinned' : ''}`} aria-label="Toggle always on top" title="Always on top" onClick={() => update('alwaysOnTop', !settings.alwaysOnTop)}><Pin size={16}/></button></div><div className="avatar-scene"><div className="scene-circle"/><div className="scene-orbit"/><span className="scene-star star-one">✧</span><span className="scene-star star-two">✦</span><span className="scene-star star-three">✧</span><span className="scene-caption">そばにいるよ</span>{avatarVisible ? <Avatar state={state} reducedMotion={settings.reducedMotion} scale={settings.scale} reaction={reaction}/> : <div className="hidden-state"><Moon size={35}/><p>Taking a little quiet time.</p><button className="button" onClick={() => setAvatarVisible(true)}>Show Misaki</button></div>}<div className="character-caption"><span>まこと みさき</span><h2>A little presence.<br />A softer kind of everyday.</h2></div></div><div className="presence-bottom"><div className={`state-pill ${busy ? 'thinking' : ''}`}><span/>{stateLabels[state]}</div><div><button className="icon-button" title={avatarVisible ? 'Hide avatar' : 'Show avatar'} aria-label={avatarVisible ? 'Hide avatar' : 'Show avatar'} onClick={() => { if (native) void hideWindow().catch(() => setNotice('Could not hide window.')); else setAvatarVisible(v => !v); }}><Minus size={18}/></button><button className="icon-button" title="Character preferences" aria-label="Character preferences" onClick={() => setPage('settings')}><Settings2 size={16}/></button></div></div></section>
           <section className="chat-card" aria-label="Conversation"><div className="chat-header"><span className="mini-avatar"><Flower2 size={20}/></span><div><h2>A moment with Misaki</h2><p><span className={`connection-dot ${modelReady ? 'connected' : ''}`}/>{settings.provider === 'local' && checking && !health ? 'Finding your local mind…' : modelReady ? settings.provider === 'local' ? 'Here for you · running locally' : `Here for you · ${providerNames[settings.provider]} cloud` : 'Your space is ready · connect a model'}</p></div><div className="menu-wrap"><button className="icon-button" title="Conversation options" aria-label="Conversation options" aria-expanded={moreMenu} onClick={() => setMoreMenu(v => !v)}><Ellipsis size={21}/></button>{moreMenu && <div className="dropdown options-menu"><button onClick={clearChat}><Trash2 size={14}/>Clear conversation</button><button onClick={exportChat}><Download size={14}/>Export as text</button><button onClick={() => { setMoreMenu(false); setPage('settings'); }}><Settings2 size={14}/>Preferences</button></div>}</div></div>
             <div className="chat-scroll" role="log" aria-live="polite" aria-relevant="additions text">{messages.length === 0 ? <div className="chat-welcome"><span className="welcome-icon"><Sparkles size={23}/></span><div className="eyebrow">A NEW LITTLE BEGINNING</div><h3>Hey, I’m Misaki.<span>It’s nice to be here.</span></h3><p>Bring your big ideas, your tangled code,<br className="wide-only"/> or just yourself. We’ll figure it out together.</p><div className="starter-grid"><button onClick={() => { setDraft('Help me untangle a coding problem.'); input.current?.focus(); }}><Code2 size={17}/><span>Untangle some code</span><ArrowRight size={14}/></button><button onClick={() => { setDraft('Help me plan a calm, focused day.'); input.current?.focus(); }}><Leaf size={17}/><span>Find a little focus</span><ArrowRight size={14}/></button><button onClick={() => { setDraft('Hi Misaki! Let’s get to know each other.'); input.current?.focus(); }}><Coffee size={17}/><span>Just have a chat</span><ArrowRight size={14}/></button></div></div> : <div className="message-list"><div className="conversation-date">{new Date(messages[0].time).toLocaleDateString([], { month: 'long', day: 'numeric' })} · your little corner</div>{messages.map(message => <article key={message.id} className={`message ${message.role} ${message.status === 'failed' ? 'failed' : ''}`}><div className="message-meta">{message.role === 'assistant' ? 'Misaki' : 'You'}<span>{time(message.time)}</span></div><div className="message-body">{message.content}</div>{proposals[message.id] && <DesktopActions actions={proposals[message.id]} windowGrant={sharedWindow.current} onResult={content => setMessages(previous => [...previous, { id: crypto.randomUUID(), role: 'assistant', content, time: Date.now(), status: 'complete', provider: message.provider }])}/>}{message.status === 'failed' && <small>Not included in the next reply’s context.</small>}{message.latency !== undefined && <small>{(message.latency / 1000).toFixed(1)}s · {(message.provider ?? 'local') === 'local' ? 'local inference' : `${providerNames[message.provider!]} cloud`}</small>}</article>)}{busy && <div className="thinking-message"><span/><span/><span/><small>Misaki is thinking…</small></div>}<div ref={bottom}/></div>}</div>
             {error && <div className="chat-error" role="alert"><WifiOff size={16}/><div>{error}<button onClick={() => { const last = messages.filter(m => m.role === 'user').at(-1); if (last) void submit(last.content); }}>Try again<RefreshCw size={12}/></button></div><button className="icon-button" aria-label="Dismiss error" onClick={() => { setError(''); dispatch('RESET'); }}><X size={14}/></button></div>}

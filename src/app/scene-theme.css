@@ -67,6 +67,9 @@ button:hover{filter:none}
 .expression-grid button[aria-pressed=true]{background:#b4874940;border-color:#dcb47b88;color:#ffe3b0}
 .expression-grid button>span{color:#dfb579}
 .expression-panel>p{color:#efb3a6}
+.automatic-expressions{display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;color:#efdfc6;font-size:11px;line-height:1.5;cursor:pointer}
+.automatic-expressions input{accent-color:#dcb47b;margin:3px 0 0}
+.automatic-expressions small{display:block;margin-top:3px;color:#c5bba8;font-size:10px;line-height:1.5}
 .chat-card,.compact .chat-card,.native .chat-card{position:absolute;inset:auto auto 26px 50%;transform:translateX(-50%);width:min(900px,calc(100% - 100px));height:auto;max-height:42svh;min-height:0;display:flex;flex-direction:column;flex:none;margin:0;padding:0;border:1px solid #e2cda736;border-radius:14px;background:linear-gradient(120deg,#1c251db8,#20271c91);backdrop-filter:blur(18px);box-shadow:0 14px 65px #07120c30;z-index:10;overflow:visible}
 .chat-header,.compact .chat-header{height:auto;min-height:51px;padding:12px 23px 7px;border:0;gap:10px;flex-shrink:0}
 .chat-header .mini-avatar{display:none}

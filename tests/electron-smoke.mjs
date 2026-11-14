@@ -35,7 +35,7 @@ const bridge = createHttpServer(async (request, response) => {
     }
     configured[provider] = request.method === 'POST';
     data = status(provider);
-  } else if (request.url === '/v1/chat') data = { request_id: body.request_id, reply: 'I can open that for you.', actions: [{ type: body.message.includes('music') ? 'play_music' : 'open_folder', target: body.message.includes('music') ? '' : body.message.includes('project folder') ? path.resolve('.') : 'downloads' }], route: body.mode, status: 'ok', model: body.model, citations: [], latency_ms: 1 };
+  } else if (request.url === '/v1/chat') data = { request_id: body.request_id, reply: 'I can open that for you.', emotion: 'happy', actions: [{ type: body.message.includes('music') ? 'play_music' : 'open_folder', target: body.message.includes('music') ? '' : body.message.includes('project folder') ? path.resolve('.') : 'downloads' }], route: body.mode, status: 'ok', model: body.model, citations: [], latency_ms: 1 };
   else { response.writeHead(404); data = { detail: 'Unknown test endpoint' }; }
   response.end(JSON.stringify(data));
 });
@@ -83,6 +83,7 @@ try {
   await page.getByRole('textbox', { name: 'Message Misaki' }).fill('Open my downloads folder');
   await page.getByRole('button', { name: 'Send message' }).click();
   await page.getByRole('button', { name: 'Open', exact: true }).waitFor();
+  await expect(page.locator('.live2d-avatar')).toHaveAttribute('data-emotion', 'happy');
   assert.equal(await desktop.evaluate(() => globalThis.opened.length), 0);
   await page.getByRole('button', { name: 'Open', exact: true }).click();
   await expect(page.locator('.desktop-action').first().getByRole('status')).toContainText('Opened');
