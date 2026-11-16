@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, FolderOpen, ListMusic, Music2, Pause, Play, SkipBack, SkipForward, Square, X } from 'lucide-react';
-import { desktopError, type DesktopAction, type MediaStatus, type ScreenImage, type ScreenSource, type Track } from './electron';
+import { desktopTask, desktopError, type DesktopAction, type MediaStatus, type ScreenImage, type ScreenSource, type Track } from './electron';
 import MusicPlaylist from './MusicPlaylist';
 
 export default function DesktopTools({ provider, busy, screen, onScreen, onStop, onResult, awareness, onAwareness, playlistOpen, onPlaylistOpen, compact }: { provider: string; busy: boolean; screen: ScreenImage | null; onScreen: (image: ScreenImage) => void; onStop: () => void; onResult: (message: string) => void; awareness: boolean; onAwareness: (value: boolean) => void; playlistOpen: boolean; onPlaylistOpen: (value: boolean) => void; compact: boolean }) {
@@ -42,14 +42,14 @@ export default function DesktopTools({ provider, busy, screen, onScreen, onStop,
   async function execute(action: DesktopAction) {
     if (!api || lock.current) return;
     lock.current = true; setWorking(true); setError('');
-    try { const result = await api.action(action); onResult(`Desktop result: ${result.message}`); setStatus(await api.mediaStatus()); }
+    try { const result = await desktopTask(() => api.action(action)); onResult(`Desktop result: ${result.message}`); setStatus(await api.mediaStatus()); }
     catch (failure) { setError(desktopError(failure)); }
     finally { lock.current = false; setWorking(false); }
   }
   async function chooseLibrary() {
     if (!api || lock.current) return;
     lock.current = true; setWorking(true); setError('');
-    try { const value = await api.chooseMusicLibrary(); if (value) { setStatus(value); onAwareness(true); } }
+    try { const value = await desktopTask(() => api.chooseMusicLibrary()); if (value) { setStatus(value); onAwareness(true); } }
     catch (failure) { setError(desktopError(failure)); }
     finally { lock.current = false; setWorking(false); }
   }

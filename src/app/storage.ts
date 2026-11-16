@@ -1,7 +1,7 @@
 import type { Provider } from '../api/client';
-export interface Settings { model: string; provider: Provider; cloudModels: { gemini: string; grok: string }; alwaysOnTop: boolean; reducedMotion: boolean; rememberHistory: boolean; scale: number }
+export interface Settings { model: string; provider: Provider; cloudModels: { gemini: string; grok: string }; alwaysOnTop: boolean; reducedMotion: boolean; rememberHistory: boolean; scale: number; idleAnimations: boolean; idleConversations: boolean; idleFrequency: number; idleCooldown: number; sleepyBehavior: boolean; sleepyAfter: number; animationIntensity: number }
 export interface Message { id: string; role: 'user' | 'assistant'; content: string; time: number; status: 'pending' | 'complete' | 'failed'; latency?: number; provider?: Provider }
-export const DEFAULTS: Settings = { model: 'qwen3:4b', provider: 'local', cloudModels: { gemini: '', grok: '' }, alwaysOnTop: true, reducedMotion: false, rememberHistory: false, scale: 1 };
+export const DEFAULTS: Settings = { model: 'qwen3:4b', provider: 'local', cloudModels: { gemini: '', grok: '' }, alwaysOnTop: true, reducedMotion: false, rememberHistory: false, scale: 1, idleAnimations: true, idleConversations: false, idleFrequency: 180, idleCooldown: 600, sleepyBehavior: true, sleepyAfter: 600, animationIntensity: 1 };
 const KEY = 'misaki.settings.v1';
 const HISTORY = 'misaki.history.v1';
 export function readSettings(): Settings {
@@ -19,6 +19,13 @@ export function readSettings(): Settings {
       reducedMotion: typeof stored.reducedMotion === 'boolean' ? stored.reducedMotion : DEFAULTS.reducedMotion,
       rememberHistory: stored.rememberHistory === true,
       scale: typeof stored.scale === 'number' && [0.85, 1, 1.15].includes(stored.scale) ? stored.scale : 1,
+      idleAnimations: stored.idleAnimations !== false,
+      idleConversations: stored.idleConversations === true,
+      idleFrequency: [120, 180, 300, 600].includes(stored.idleFrequency) ? stored.idleFrequency : DEFAULTS.idleFrequency,
+      idleCooldown: [300, 600, 1200, 1800].includes(stored.idleCooldown) ? stored.idleCooldown : DEFAULTS.idleCooldown,
+      sleepyBehavior: stored.sleepyBehavior !== false,
+      sleepyAfter: [300, 600, 1200].includes(stored.sleepyAfter) ? stored.sleepyAfter : DEFAULTS.sleepyAfter,
+      animationIntensity: [.4, .7, 1].includes(stored.animationIntensity) ? stored.animationIntensity : DEFAULTS.animationIntensity,
     };
   } catch { return DEFAULTS; }
 }

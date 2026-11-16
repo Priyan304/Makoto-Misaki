@@ -170,7 +170,7 @@ test('idle gestures move the real rig, pause when hidden, and respect reduced mo
   const avatar = page.locator('.live2d-avatar');
   const canvas = avatar.locator('canvas');
   await expect(avatar).toHaveAttribute('data-status', 'ready', { timeout: 30000 });
-  await expect(avatar).toHaveAttribute('data-gesture', /look-around|head-tilt|nod|weight-shift|soft-smile/, { timeout: 10000 });
+  await expect(avatar).toHaveAttribute('data-gesture', /look-around|head-tilt|nod|weight-shift|soft-smile|thinking/, { timeout: 10000 });
   const first = await canvas.screenshot();
   await page.waitForTimeout(600);
   expect(changedPixels(first, await canvas.screenshot())).toBeGreaterThan(100);

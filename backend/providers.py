@@ -104,7 +104,7 @@ class CloudProviders:
         except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError) as error:
             raise provider_error(provider, error) from None
 
-    async def generate(self, provider: CloudProvider, model: str, message: str, history: list[dict], system_prompt: str, *, image: dict | None = None):
+    async def generate(self, provider: CloudProvider, model: str, message: str, history: list[dict], system_prompt: str, *, image: dict | None = None, schema: dict | None = None):
         key = self._keys.get(provider)
         if not key:
             raise HTTPException(409, f'Add your {NAMES[provider]} API key in Connection before chatting.')
@@ -118,7 +118,7 @@ class CloudProviders:
                 contents.append({'role': 'user', 'parts': [{'text': message}, *([{'inlineData': {'mimeType': image['mime_type'], 'data': image['data']}}] if image else [])]})
                 response = await self.client.post(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent', headers={'x-goog-api-key': key}, json={
                     'systemInstruction': {'parts': [{'text': system_prompt}]}, 'contents': contents,
-                    'generationConfig': {'maxOutputTokens': 4096},
+                    'generationConfig': {'maxOutputTokens': 4096, **({'responseMimeType': 'application/json', 'responseJsonSchema': schema} if schema else {})},
                 })
                 response.raise_for_status()
                 payload = response.json()

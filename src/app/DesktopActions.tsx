@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { DesktopAction, ScreenImage } from './electron';
+import { desktopTask } from './electron';
 
 type Outcome = { message: string; status: 'completed' | 'cancelled' | 'failed' };
 function actionLabel(action: DesktopAction) {
@@ -18,7 +19,7 @@ export default function DesktopActions({ actions, onResult, windowGrant }: { act
     if (!window.misakiDesktop || lock.current || results[index]?.status === 'completed') return;
     lock.current = true; setRunning(index);
     try {
-      const result = await window.misakiDesktop.action(action);
+      const result = await desktopTask(() => window.misakiDesktop!.action(action));
       setResults(previous => ({ ...previous, [index]: result }));
       onResult(`Desktop result: ${result.message}`);
     } catch (error) {

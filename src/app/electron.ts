@@ -30,3 +30,11 @@ export function validAction(value: unknown): value is DesktopAction {
 }
 
 export function desktopError(error: unknown) { return error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : 'Desktop action failed. Try again.'; }
+
+// Cosmetic lifecycle events cannot execute tools; IPC remains the only path.
+export async function desktopTask<T>(run: () => Promise<T>): Promise<T> {
+  window.dispatchEvent(new CustomEvent('misaki-desktop-task', { detail: { phase: 'start' } }));
+  let status = 'failed';
+  try { const result = await run(); status = result && typeof result === 'object' && 'status' in result ? String(result.status) : result === null ? 'cancelled' : 'completed'; return result; }
+  finally { window.dispatchEvent(new CustomEvent('misaki-desktop-task', { detail: { phase: 'end', status } })); }
+}

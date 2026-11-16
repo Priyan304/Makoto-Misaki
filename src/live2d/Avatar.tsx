@@ -7,10 +7,11 @@ import FallbackAvatar from './FallbackAvatar';
 import { loadCubismCore } from './runtime';
 import { expressionChoices, loadExpressions, type ExpressionId } from './expressions';
 import { AvatarBehavior, type Reaction } from './behavior';
+import { idleDefaults, type IdleOptions } from './IdleBehaviorController';
 
-export default function Avatar({ state, reducedMotion, scale = 1, reaction }: { state: CompanionState; reducedMotion: boolean; scale?: number; reaction?: Reaction }) {
+export default function Avatar({ state, reducedMotion, scale = 1, reaction, idleOptions = idleDefaults }: { state: CompanionState; reducedMotion: boolean; scale?: number; reaction?: Reaction; idleOptions?: IdleOptions }) {
   const host = useRef<HTMLDivElement>(null);
-  const options = useRef({ state, reducedMotion, scale, reaction });
+  const options = useRef({ state, reducedMotion, scale, reaction, idleOptions });
   const refresh = useRef<() => void>(() => {});
   const selected = useRef<ExpressionId[]>([]);
   const [activeExpressions, setActiveExpressions] = useState<ExpressionId[]>([]);
@@ -21,10 +22,11 @@ export default function Avatar({ state, reducedMotion, scale = 1, reaction }: { 
   const [expressionsReady, setExpressionsReady] = useState(false);
   selected.current = activeExpressions;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  options.current = { state, reducedMotion, scale, reaction: automatic && !manual ? reaction : undefined };
+  options.current = { state, reducedMotion, scale, reaction: automatic && !manual ? reaction : undefined, idleOptions };
 
   useEffect(() => { refresh.current(); }, [state, reducedMotion, scale, reaction, automatic, manual]);
   useEffect(() => { refresh.current(); }, [activeExpressions]);
+  useEffect(() => { refresh.current(); }, [idleOptions.enabled, idleOptions.sleepy, idleOptions.executing, idleOptions.activity, idleOptions.intensity, idleOptions.waitingAfter, idleOptions.boredAfter, idleOptions.sleepyAfter]);
   useEffect(() => {
     if (automatic) {
       setManual(false);
@@ -155,10 +157,11 @@ export default function Avatar({ state, reducedMotion, scale = 1, reaction }: { 
       internal.breath.updateParameters = (core, dt) => {
         if (!isStill()) updateBreath(core, dt);
         frameDelta = Math.max(0, Math.min(dt, .05));
-        frame = behavior.update(frameDelta, options.current.state, options.current.reaction, isStill());
+        frame = behavior.update(frameDelta, options.current.state, options.current.reaction, isStill(), options.current.idleOptions);
         for (const [id, value] of Object.entries(frame.parameters)) setParameter(id, value);
         container.dataset.emotion = frame.emotion;
         container.dataset.gesture = frame.action;
+        container.dataset.idleState = frame.idleState;
       };
       app.stage.addChild(model);
       model.anchor.set(.5, 0);

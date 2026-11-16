@@ -17,7 +17,8 @@ describe('avatar behavior', () => {
         expect(Math.abs(value)).toBeLessThanOrEqual(id.includes('Angle') ? 20 : 1);
       }
     }
-    expect(new Set(observed)).toEqual(new Set(gestures));
+    expect(observed.every(kind => gestures.includes(kind as typeof gestures[number]))).toBe(true);
+    expect(new Set(observed).size).toBeGreaterThanOrEqual(5);
     expect(observed.every((action, index) => index === 0 || action !== observed[index - 1])).toBe(true);
     for (let i = 0; i < 5; i++) expect(behavior.update(0, 'idle')).toEqual(frame);
     expect(behavior.update(.05, 'thinking').action).toBe('rest');

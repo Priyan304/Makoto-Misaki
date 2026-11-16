@@ -4,6 +4,8 @@ A personal, local-first AI companion for Priyadharshan. This repository implemen
 
 The companion opens into a lantern-lit Japanese garden with a large portrait matching the supplied screenshot reference and a separate translucent conversation box on the right on wide screens. The portrait stays the same size as conversation history grows. Mobile and compact layouts use bottom dialogue. The generated backdrop is served locally; its creation prompt is recorded in [the backdrop notes](docs/design/scene-backdrop.md).
 
+Avatar and idle update: roleplay directions now become validated expressions and gestures instead of cluttering dialogue. **Preferences → Companion behavior** controls weighted idle gestures, sleepy behavior, intensity and optional model-generated conversation starters (off by default). Starters respect cooldowns, music, typing and window visibility and cannot perform desktop actions. See the [roadmap review](docs/roadmap-review.md) and [behavior guide](docs/avatar-behavior.md).
+
 Garden redesign, 2 November 2026: the production build and seven browser checks pass, including portrait centering, transparent input, bottom conversation placement, backdrop loading, all expression toggles, and existing chat flows. Desktop, mobile, compact and preferences screenshots were visually inspected.
 
 Provider update: build, six unit checks, nineteen backend checks and nine browser checks pass. Provider tests use mocked APIs and fake keys; live Gemini/Grok generation has not been exercised without an account key. **Restart the running Misaki launcher** after this update, then open the model selector to add a provider key. UI-only keys must be entered again after a bridge restart; `.env` keys now reconnect automatically.

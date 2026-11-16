@@ -26,4 +26,10 @@ describe('provider settings migration', () => {
     ]));
     expect(readHistory(true).map(message => message.provider)).toEqual(['local', 'grok']);
   });
+  it('migrates behavior settings without enabling unsolicited API calls and bounds timing', () => {
+    values.set('misaki.settings.v1', JSON.stringify({ idleFrequency: 0, idleCooldown: -10, animationIntensity: 999, sleepyAfter: '600' }));
+    expect(readSettings()).toMatchObject({ idleConversations: false, idleAnimations: true, idleFrequency: 180, idleCooldown: 600, animationIntensity: 1, sleepyAfter: 600 });
+    writeSettings({ ...DEFAULTS, idleConversations: true, idleFrequency: 120, idleCooldown: 1200 });
+    expect(readSettings()).toMatchObject({ idleConversations: true, idleFrequency: 120, idleCooldown: 1200 });
+  });
 });

@@ -7,7 +7,7 @@ import re
 
 DESKTOP_PROMPT = '''
 The Electron desktop host is available. Return ONLY a JSON object:
-{"reply":"your conversational reply", "emotion":"neutral", "actions":[{"type":"open_file", "target":""}]}.
+{"message":"your conversational reply", "emotion":"neutral", "actions":[{"type":"open_file", "target":""}]}.
 For ordinary conversation use an empty actions array. At most 3 actions.
 Available types: open_file (document/image/video), open_folder, play_media (local
 audio in Misaki's controllable mpv player; play_music is an alias),

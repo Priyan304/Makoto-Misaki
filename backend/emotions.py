@@ -2,23 +2,24 @@
 import json
 from typing import Literal, get_args
 
-Emotion = Literal['neutral', 'happy', 'affectionate', 'amused', 'curious', 'concerned', 'sad', 'surprised', 'angry']
+Emotion = Literal['neutral', 'happy', 'affectionate', 'amused', 'curious', 'concerned', 'sad', 'surprised', 'angry', 'embarrassed', 'thinking', 'relieved', 'sleepy']
 
 EMOTION_PROMPT = '''
 Choose an avatar reaction suited to the user's latest message and the conversation.
 Include an "emotion" field in your reply JSON, choosing exactly one of:
-neutral, happy, affectionate, amused, curious, concerned, sad, surprised, angry.
+neutral, happy, affectionate, amused, curious, concerned, sad, surprised, angry,
+embarrassed, thinking, relieved, sleepy.
 This is your character's expression, not a diagnosis of the user's emotions.
 Use concerned for distress or frustration, happy for good news or thanks,
-affectionate for affection directed at you, curious for a question, amused for
+embarrassed for compliments, affectionate for established mutual affection,
+curious for a question, amused for
 shared humor. Be sensitive to negation, sarcasm, quoted text and context. Do not
 mirror anger at a distressed user. Angry is for an explicitly requested angry
 expression or appropriate playful roleplay. Neutral is fine for routine tasks.
 No clothing changes, arbitrary rig parameters or extra actions are permitted.
 '''
 BROWSER_REPLY_PROMPT = '''
-Return ONLY a JSON object with "reply" (your natural conversational response)
-and "emotion" (the avatar reaction). Example: {"reply":"Hello!","emotion":"happy"}.
+Use the dialogue and avatar JSON format described below, with an empty actions array.
 No desktop tools are available in this browser conversation.
 '''
 

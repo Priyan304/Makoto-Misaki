@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { validAction, type DesktopAction, type ScreenImage } from '../app/electron';
-import { isEmotion, type Emotion } from '../live2d/behavior';
+import { isEmotion, expressions, motions, type Emotion, type AvatarMetadata } from '../live2d/behavior';
 
 export type Provider = 'local' | 'gemini' | 'grok';
 export type CloudProvider = Exclude<Provider, 'local'>;
@@ -15,11 +15,12 @@ export interface Health {
   detail: string;
 }
 export interface Turn { role: 'user' | 'assistant'; content: string }
-export interface ChatReply {
+export interface ChatReply extends AvatarMetadata {
   request_id: string; reply: string; model: string; route: Provider; status: 'ok'; latency_ms: number;
   citations: { title: string; uri?: string }[];
   actions?: DesktopAction[];
   emotion?: Emotion;
+  message?: string;
 }
 export class ApiError extends Error {}
 
@@ -65,11 +66,15 @@ export async function getHealth(signal?: AbortSignal): Promise<Health> {
   return data;
 }
 
-export async function chat(input: { request_id: string; conversation_id: string; message: string; model: string; mode: Provider; history: Turn[]; desktop?: boolean; screen?: ScreenImage; desktop_context?: string }, signal: AbortSignal): Promise<ChatReply> {
+export async function chat(input: { request_id: string; conversation_id: string; message: string; model: string; mode: Provider; history: Turn[]; desktop?: boolean; screen?: ScreenImage; desktop_context?: string; kind?: 'chat' | 'idle' }, signal: AbortSignal): Promise<ChatReply> {
   const data = await request('/v1/chat', 'POST', input, signal) as ChatReply;
   if (data.request_id !== input.request_id || typeof data.reply !== 'string' || data.route !== input.mode || data.status !== 'ok') throw new ApiError('The bridge returned an invalid reply.');
   if (data.actions !== undefined && (!Array.isArray(data.actions) || data.actions.length > 3 || !data.actions.every(validAction))) throw new ApiError('The model returned invalid desktop actions.');
   if (!isEmotion(data.emotion)) data.emotion = undefined;
+  if (!expressions.includes(data.expression!)) data.expression = undefined;
+  if (!motions.includes(data.motion!)) data.motion = undefined;
+  if (typeof data.intensity !== 'number' || !Number.isFinite(data.intensity)) data.intensity = undefined;
+  else data.intensity = Math.max(0, Math.min(1, data.intensity));
   return data;
 }
 

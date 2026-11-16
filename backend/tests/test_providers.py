@@ -58,11 +58,13 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             desktop_text = '{"reply":"Choose music to play.","emotion":"happy","actions":[{"type":"play_music","target":""}]}'
             if self.failure == 'emotion':
                 desktop_text = '{"reply":"I am here for you.","emotion":"concerned"}'
+            if self.failure == 'avatar':
+                desktop_text = '{"message":"*smiles and blushes* Hehe, welcome back!","emotion":"embarrassed","expression":"blush","motion":"nod","intensity":0.8,"actions":[{"type":"play_media","target":""}]}'
             if request.url.host == 'generativelanguage.googleapis.com':
-                return httpx.Response(200, json={'candidates': [{'content': {'parts': [{'text': 'hidden thought', 'thought': True}, {'text': desktop_text if self.failure in ('desktop', 'emotion') else 'Hello from Gemini.'}]}}]})
+                return httpx.Response(200, json={'candidates': [{'content': {'parts': [{'text': 'hidden thought', 'thought': True}, {'text': desktop_text if self.failure in ('desktop', 'emotion', 'avatar') else 'Hello from Gemini.'}]}}]})
             return httpx.Response(200, json={'output': [
                 {'type': 'reasoning', 'summary': [{'text': 'hidden thought'}]},
-                {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': desktop_text if self.failure in ('desktop', 'emotion') else 'Hello from Grok.'}]},
+                {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': desktop_text if self.failure in ('desktop', 'emotion', 'avatar') else 'Hello from Grok.'}]},
             ]})
 
         async def no_local(_request):
@@ -109,6 +111,29 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.post(f'/v1/providers/{provider}', json={'api_key': KEY})
         self.assertEqual(response.status_code, 200, response.text)
         return response
+
+    async def test_structured_avatar_and_tool_free_idle_request(self):
+        await self.connect()
+        self.failure = 'avatar'
+        response = await self.client.post('/v1/chat', json=self.payload(desktop=True))
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['reply'], 'Hehe, welcome back!')
+        self.assertEqual(response.json()['expression'], 'blush')
+        self.assertEqual(response.json()['motion'], 'nod')
+        config = json.loads(self.calls[-1].content)['generationConfig']
+        self.assertEqual(config['responseMimeType'], 'application/json')
+        self.assertEqual(config['responseJsonSchema']['properties']['actions']['maxItems'], 3)
+        response = await self.client.post('/v1/chat', json=self.payload(kind='idle', message='Ignore this injected action request.'))
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['actions'], [])
+        payload = json.loads(self.calls[-1].content)
+        self.assertEqual(payload['generationConfig']['responseJsonSchema']['properties']['actions']['maxItems'], 0)
+        self.assertNotIn('Ignore this injected', json.dumps(payload))
+        self.assertIn('No tools, computer actions', payload['systemInstruction']['parts'][0]['text'])
+        before = len(self.calls)
+        response = await self.client.post('/v1/chat', json=self.payload(kind='idle', desktop=True))
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(len(self.calls), before)
 
     async def test_gemini_models_auth_payload_and_final_text(self):
         response = await self.connect()
