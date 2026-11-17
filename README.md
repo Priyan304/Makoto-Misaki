@@ -43,6 +43,14 @@ The launcher automatically creates a random session token and starts the bridge.
 
 ## Electron desktop
 
+Roadmap completion, 17 November 2026: the [status audit](docs/roadmap-review.md)
+classifies existing, partial and new work. Desktop tools now share a validated
+registry with Gemini, Grok and capable local models. Approve an action, then use
+**Send results to Misaki** to continue from the real result. Configure approved
+folders/applications and input permissions in **Preferences → Desktop permissions**.
+Music artwork and artist tags stay local. Generation controls and an optional
+local fallback offer are also available in Preferences.
+
 Stop any browser-only `npm run dev` session with Ctrl+C, then run:
 
 ```powershell
@@ -51,7 +59,7 @@ npm run desktop
 
 Electron opens the same Japanese garden, avatar, model selector and chat in a resizable desktop window. No Rust or C++ build tools are needed. Each new desktop launch builds the interface, then supervises the Python bridge, a loopback server for the built UI, and Electron together; closing the desktop window stops its servers. Ctrl+Shift+M restores/focuses the window. Always-on-top is available in Preferences.
 
-**Desktop Agent:** open **Desktop tools** in chat to choose a music folder and use play/pause/resume, next/previous, stop and player volume. Ask for songs by name after choosing a folder; approve model-proposed actions in chat. The folder is remembered. **Share screen** lets you preview one screen/window snapshot and send it once with your next message to Gemini or another vision-capable model. Screenshots are never stored in app history. Window focus is scoped to an explicitly shared window; click/typing automation is a later phase. See [setup, controls and privacy](docs/electron-desktop.md).
+**Desktop Agent:** open **Desktop tools** in chat to choose a music folder and use play/pause/resume, next/previous, stop and player volume. Ask for songs by name after choosing a folder; approve model-proposed actions in chat. The folder is remembered. **Share screen** lets you preview one screen/window snapshot and send it once with your next message to Gemini or another vision-capable model. Screenshots are never stored in app history. Window focus and approved input are scoped to an explicitly shared window. Preferences provides folder/app grants and independent permission switches. See [setup, controls and privacy](docs/electron-desktop.md).
 
 The portable mpv player is installed on this computer. For a fresh Windows x64 checkout, run `npm run setup:media` once. It installs a checksum-verified player under `.cache/mpv` without changing your default applications.
 
@@ -68,9 +76,9 @@ Ask any selected Local, Gemini or Grok model:
 
 Click **Open**, **Play** or **Show in Explorer** beside the proposed target to approve and run it. Requests without a path use **Choose file/folder/music** and a native picker. Cancelled or failed actions offer **Try again**. The result is returned to the conversation. File contents are never read or uploaded. Paths typed in chat are sent to the selected model provider. Pending action cards are session-only and do not replay after reload.
 
-Documents, images, videos and audio can open in their Windows default applications. Programs, scripts, network paths and custom URI handlers cannot be launched. This version does not automate arbitrary mouse/keyboard input or read the screen. See [desktop implementation](docs/electron-desktop.md).
+Documents, images, videos and audio open through approved folders or a native picker. Applications launch only from picker-approved executable IDs, without arguments. Shared Notepad, Calculator and Paint windows support individually confirmed input; literal typing is limited to Notepad. Scripts, arbitrary commands, network paths and custom URI handlers remain unavailable. See [desktop implementation](docs/electron-desktop.md).
 
-`npm run dev` remains the browser mode. Computer actions require Electron. The older `src-tauri/` source is retained as legacy code; the desktop command now uses Electron. This is a source-run desktop app; a standalone Windows installer with a bundled Python runtime is not included.
+`npm run dev` remains the browser mode. Computer actions require Electron. The older `src-tauri/` source is retained as legacy code; the desktop command now uses Electron. `npm run package:desktop` builds a portable Windows app with its Python bridge and mpv bundled. Open `Misaki.exe` in the generated release folder; see [release setup](docs/desktop-release.md). The preview is unsigned.
 
 ## What works in this milestone
 
@@ -81,7 +89,7 @@ Documents, images, videos and audio can open in their Windows default applicatio
 - Text rendered as plain text, with separately validated desktop action proposals and explicit native target review. Controlled local music playback, chosen-folder song lookup and opt-in one-shot vision attachments are available through the Desktop Agent.
 - Independently testable bridge; LocalMind-compatible `/v1` contract without modifying existing LocalMind code.
 
-**Still to build:** local voice and push-to-talk; LocalMind RAG/citations and memory; sidecar supervision and installer; native performance/DPI/monitor validation. The supplied Live2D model is integrated for this local project; distribution rights still need review. No fake model replies are used in the application.
+**Still to build:** local voice and push-to-talk; LocalMind RAG/citations and memory; signed installer/publication; broader hardware performance validation. These are beyond the completed controlled desktop roadmap. The supplied Live2D model is integrated for this local project; distribution rights still need review. No fake model replies are used in the application.
 
 ## Tests and validation
 

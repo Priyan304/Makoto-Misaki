@@ -86,6 +86,10 @@ else {
       dialog.showMessageBox(win, { type: 'error', title: 'Misaki interface stopped', message: 'The interface stopped responding.', detail: 'Reload the interface to try again.', buttons: ['Reload interface', 'Close Misaki'], defaultId: 0, cancelId: 1 }).then(({ response }) => { if (win.isDestroyed()) return; if (response === 0) void win.loadURL(origin); else win.close(); }).catch(() => {});
     });
     handle('misaki:action', agent.action);
+    handle('misaki:permissions', agent.permissions);
+    handle('misaki:permission-set', agent.setPermission);
+    handle('misaki:grant-choose', agent.chooseGrant);
+    handle('misaki:grant-revoke', agent.revokeGrant);
     handle('misaki:media-status', agent.status);
     handle('misaki:media-library', agent.chooseLibrary);
     handle('misaki:media-search', agent.search);

@@ -80,6 +80,11 @@ try {
   assert.equal(await page.evaluate(() => JSON.stringify(window.misakiDesktop).includes('token')), false);
   await assert.rejects(page.evaluate(() => window.misakiDesktop.backend('/not-allowed', 'GET')), /Unsupported/);
   await assert.rejects(page.evaluate(() => window.misakiDesktop.action({ type: 'exec', target: 'cmd' })), /Unsupported/);
+  await assert.rejects(page.evaluate(() => window.misakiDesktop.action({ type: 'open_folder', target: 'downloads' })), /approved/);
+  // Grant only fixture paths through the same native picker used in Preferences.
+  await desktop.evaluate(({dialog,app}) => { dialog.showOpenDialog = async () => ({canceled:false,filePaths:[app.getPath('downloads')]}); });
+  await page.evaluate(() => window.misakiDesktop.chooseGrant('folder'));
+  await desktop.evaluate(({dialog},folder) => { dialog.showOpenDialog = async () => ({canceled:globalThis.pickerCancelled,filePaths:[folder+'/sample.wav']}); },root);
   await page.getByRole('textbox', { name: 'Message Misaki' }).fill('Open my downloads folder');
   await page.getByRole('button', { name: 'Send message' }).click();
   await page.getByRole('button', { name: 'Open', exact: true }).waitFor();

@@ -104,7 +104,7 @@ class CloudProviders:
         except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError) as error:
             raise provider_error(provider, error) from None
 
-    async def generate(self, provider: CloudProvider, model: str, message: str, history: list[dict], system_prompt: str, *, image: dict | None = None, schema: dict | None = None):
+    async def generate(self, provider: CloudProvider, model: str, message: str, history: list[dict], system_prompt: str, *, image: dict | None = None, schema: dict | None = None, tools=None, continuation=None, results=None, temperature=0.7, max_tokens=4096):
         key = self._keys.get(provider)
         if not key:
             raise HTTPException(409, f'Add your {NAMES[provider]} API key in Connection before chatting.')
@@ -116,20 +116,37 @@ class CloudProviders:
             if provider == 'gemini':
                 contents = [{'role': 'model' if turn['role'] == 'assistant' else 'user', 'parts': [{'text': turn['content']}]} for turn in history]
                 contents.append({'role': 'user', 'parts': [{'text': message}, *([{'inlineData': {'mimeType': image['mime_type'], 'data': image['data']}}] if image else [])]})
+                if continuation:
+                    contents = continuation['contents'] + [{'role': 'user', 'parts': [{'functionResponse': {'name': call['name'], **({'id': call['id']} if call.get('id') else {}), 'response': result}} for call, result in zip(continuation['calls'], results)]}]
                 response = await self.client.post(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent', headers={'x-goog-api-key': key}, json={
                     'systemInstruction': {'parts': [{'text': system_prompt}]}, 'contents': contents,
-                    'generationConfig': {'maxOutputTokens': 4096, **({'responseMimeType': 'application/json', 'responseJsonSchema': schema} if schema else {})},
+                    'generationConfig': {'maxOutputTokens': max_tokens, 'temperature': temperature, **({'responseMimeType': 'application/json', 'responseJsonSchema': schema} if schema and not tools else {})},
+                    **({'tools': [{'functionDeclarations': tools}]} if tools else {}),
                 })
                 response.raise_for_status()
                 payload = response.json()
                 parts = payload['candidates'][0]['content']['parts']
+                calls = [part['functionCall'] for part in parts if 'functionCall' in part]
+                if calls:
+                    if not tools: raise ValueError('Unexpected tool calls')
+                    # Preserve every part/signature verbatim for Gemini's next turn.
+                    return {'calls': calls, 'state': {'contents': contents + [payload['candidates'][0]['content']], 'calls': calls}}
                 text = '\n'.join(part['text'] for part in parts if isinstance(part.get('text'), str) and not part.get('thought'))
             else:
+                inputs = [{'role': 'system', 'content': system_prompt}, *history, {'role': 'user', 'content': [{'type': 'input_text', 'text': message}, {'type': 'input_image', 'image_url': f"data:{image['mime_type']};base64,{image['data']}"}] if image else message}]
+                if continuation:
+                    inputs = continuation['input'] + [{'type': 'function_call_output', 'call_id': call['id'], 'output': __import__('json').dumps(result)} for call, result in zip(continuation['calls'], results)]
                 response = await self.client.post('https://api.x.ai/v1/responses', headers={'Authorization': f'Bearer {key}'}, json={
-                    'model': model, 'input': [{'role': 'system', 'content': system_prompt}, *history, {'role': 'user', 'content': [{'type': 'input_text', 'text': message}, {'type': 'input_image', 'image_url': f"data:{image['mime_type']};base64,{image['data']}"}] if image else message}],
-                    'stream': False, 'max_output_tokens': 4096, 'store': False,
+                    'model': model, 'input': inputs,
+                    'stream': False, 'max_output_tokens': max_tokens, 'store': False,
+                    **({'tools': [{'type': 'function', **tool} for tool in tools]} if tools else {}),
                 })
                 response.raise_for_status()
+                output = response.json()['output']
+                calls = [{'name': item['name'], 'args': __import__('json').loads(item['arguments']), 'id': item['call_id']} for item in output if item.get('type') == 'function_call']
+                if calls:
+                    if not tools: raise ValueError('Unexpected tool calls')
+                    return {'calls': calls, 'state': {'input': inputs + output, 'calls': calls}}
                 text = '\n'.join(part['text'] for item in response.json()['output'] if item.get('type') == 'message' and item.get('role') == 'assistant'
                                  for part in item.get('content', []) if part.get('type') == 'output_text' and isinstance(part.get('text'), str))
             if not isinstance(text, str) or not text.strip():

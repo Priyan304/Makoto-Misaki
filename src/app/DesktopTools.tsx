@@ -61,6 +61,7 @@ export default function DesktopTools({ provider, busy, screen, onScreen, onStop,
     finally { if (current === epoch.current) setPicking(false); }
   }
   function cancelPicker() { epoch.current++; setSources(null); setPicking(false); onStop(); }
+  useEffect(() => { const request = () => { void pickScreen(); }; window.addEventListener('misaki-request-screen', request); return () => window.removeEventListener('misaki-request-screen', request); }, [busy, picking, screen]);
   async function capture(source: ScreenSource) {
     if (!api || picking) return;
     const current = ++epoch.current; setPicking(true); setError(''); setSources(null);

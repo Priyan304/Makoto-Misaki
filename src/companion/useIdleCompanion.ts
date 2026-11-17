@@ -76,7 +76,7 @@ export default function useIdleCompanion(options: Options) {
         while (history.some(turn => turn.content.length > 8000) || history.reduce((sum, turn) => sum + turn.content.length, 0) > 24000) history = history.slice(1);
         const timeout = setTimeout(() => { abort.abort(); void cancelChat(id).catch(() => {}); }, 45000);
         try {
-          const reply = await chat({ request_id: id, conversation_id: snapshot.conversation, kind: 'idle', message: 'Offer a brief optional conversation starter.', model: snapshot.model, mode: snapshot.provider, history }, abort.signal);
+          const reply = await chat({ request_id: id, conversation_id: snapshot.conversation, kind: 'idle', message: 'Offer a brief optional conversation starter.', model: snapshot.model, mode: snapshot.provider, history, temperature: snapshot.settings.temperature, max_tokens: snapshot.settings.maxTokens }, abort.signal);
           if (stamp !== revision.current || abort.signal.aborted || blocked()) return;
           // Recheck music before delivery; starting playback during generation
           // must not cause an interruption when the response finishes.

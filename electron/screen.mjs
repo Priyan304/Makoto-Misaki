@@ -43,7 +43,7 @@ export function createScreen({ desktopCapturer, owner, focus = async (handle, ti
     if (window) grants.set(window.token, { id: source.id, title: source.name, expires: Date.now() + 300000 });
     return { mime_type: 'image/jpeg', data: bytes.toString('base64'), source: source.name.slice(0, 200), width: size.width, height: size.height, window };
   }
-  async function focusWindow(token) {
+  async function resolveWindow(token) {
     const grant = grants.get(token);
     if (!grant || grant.expires < Date.now()) throw new Error('This window permission expired. Share that window again.');
     const source = (await sources({ width: 0, height: 0 })).find(value => value.id === grant.id && value.name === grant.title);
@@ -51,11 +51,16 @@ export function createScreen({ desktopCapturer, owner, focus = async (handle, ti
     if (!source) throw new Error('That window is no longer available. Share it again.');
     const handle = source.id.match(/^window:(\d+):/u)?.[1];
     if (!handle || process.platform !== 'win32') throw new Error('Window focusing is supported on Windows.');
+    return { handle, title: grant.title };
+  }
+  async function focusWindow(token) {
+    const grant = await resolveWindow(token);
+    const handle = grant.handle;
     try { await focus(handle, grant.title); }
     catch { throw new Error('Windows could not focus that window. Restore it and try again.'); }
     owner()?.minimize?.(); // Keep an always-on-top companion from covering the target.
     return { status: 'completed', message: `Focused ${grant.title.slice(0, 200)}. Press Ctrl+Shift+M to return to Misaki.` };
   }
   function stop() { revision++; listed.clear(); grants.clear(); }
-  return { list, capture, focusWindow, stop };
+  return { list, capture, focusWindow, resolveWindow, stop };
 }

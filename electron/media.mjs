@@ -6,8 +6,9 @@ import { readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { parseFile, selectCover } from 'music-metadata';
 
-export const mediaTypes = new Set(['play_media', 'play_music', 'pause_media', 'resume_media', 'stop_media', 'next_track', 'previous_track', 'set_volume', 'get_playback_status', 'search_media']);
+export const mediaTypes = new Set(['play_media', 'play_music', 'pause_media', 'resume_media', 'stop_media', 'next_track', 'previous_track', 'set_volume', 'get_playback_status', 'search_media', 'search_music']);
 const audio = new Set(['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac', '.opus', '.wma']);
 export const localPath = value => typeof value === 'string' && path.isAbsolute(value) && !value.startsWith('\\\\') && !value.startsWith('//') && !value.slice(2).includes(':') && !/[\x00-\x1f]/.test(value);
 const inside = (root, file) => { const relative = path.relative(root, file); return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative); };
@@ -17,6 +18,22 @@ export function createMedia({ musicPath, executable = process.env.MISAKI_MPV_PAT
   let library = null, tracks = [], partial = false, scanning = false;
   const pending = new Map();
   const events = new Set();
+  const metadata = new Map();
+  async function trackMetadata(file) {
+    if (!localPath(file)) return {};
+    try {
+      const info = await stat(file), key = `${file}:${info.mtimeMs}:${info.size}`;
+      if (metadata.has(key)) return metadata.get(key);
+      // Parse only the currently playing track, never the whole library at once.
+      if (info.size > 512 * 1024 * 1024) return {};
+      const { common } = await parseFile(file, { duration: false, skipPostHeaders: true });
+      const cover = selectCover(common.picture);
+      const value = { title: common.title?.slice(0, 300), artist: common.artist?.slice(0, 300) ?? null, album: common.album?.slice(0, 300) ?? null,
+        artwork: cover && ['image/jpeg','image/png'].includes(cover.format) && cover.data.length <= 524288 ? `data:${cover.format};base64,${Buffer.from(cover.data).toString('base64')}` : null };
+      if (metadata.size >= 8) metadata.delete(metadata.keys().next().value);
+      metadata.set(key,value); return value;
+    } catch { return {}; }
+  }
   const available = () => !!executable && existsSync(executable);
   function disconnected() {
     socket = undefined;
@@ -103,7 +120,8 @@ export function createMedia({ musicPath, executable = process.env.MISAKI_MPV_PAT
     if (!socket || socket.destroyed) return base;
     try {
       const [idle, pause, filename, volume, position, duration, playlist, index] = await Promise.all(['idle-active', 'pause', 'path', 'volume', 'time-pos', 'duration', 'playlist', 'playlist-pos'].map(property => command(['get_property', property]).catch(() => null)));
-      return { ...base, state: idle ? 'stopped' : pause ? 'paused' : filename ? 'playing' : 'stopped', path: filename, title: filename ? path.basename(filename) : null, volume: volume ?? 60, position: position ?? 0, duration: duration ?? 0, playlist: (playlist || []).slice(0, 500).map(item => ({ title: path.basename(item.filename), path: item.filename })), index: index ?? -1 };
+      const tags = filename ? await trackMetadata(filename) : {};
+      return { ...base, ...tags, state: idle ? 'stopped' : pause ? 'paused' : filename ? 'playing' : 'stopped', path: filename, title: tags.title || (filename ? path.basename(filename) : null), volume: volume ?? 60, position: position ?? 0, duration: duration ?? 0, playlist: (playlist || []).slice(0, 500).map(item => ({ title: path.basename(item.filename), path: item.filename })), index: index ?? -1 };
     } catch { return { ...base, error: 'Media player disconnected.' }; }
   }
   async function setLibrary(folder) {
@@ -151,7 +169,7 @@ export function createMedia({ musicPath, executable = process.env.MISAKI_MPV_PAT
     return file;
   }
   async function execute(action) {
-    if (action.type === 'search_media') return { status: 'completed', message: library ? `Music matches: ${JSON.stringify(search(action.target).slice(0, 3))}` : 'No music folder is selected. Choose a music folder in Desktop tools first.' };
+    if (['search_media','search_music'].includes(action.type)) return { status: 'completed', message: library ? `Music matches: ${JSON.stringify(search(action.target))}` : 'No music folder is selected. Choose a music folder in Desktop tools first.' };
     if (action.type === 'get_playback_status') {
       const { available, state, title, volume, position, duration, error, playlist, index } = await status();
       return { status: 'completed', message: JSON.stringify({ available, state, title, volume, position, duration, error, queueLength: playlist.length, index }) };

@@ -8,6 +8,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:ui": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "desktop": "node scripts/dev.mjs --desktop",
+    "package:desktop": "npm run build && node scripts/package-desktop.mjs",
     "setup:media": "node --use-system-ca scripts/setup-media.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run",
@@ -17,12 +18,15 @@
     "smoke:local": "node scripts/smoke-local.mjs",
     "check": "npm run build && npm test && npm run test:backend",
     "tauri": "tauri",
-    "test:desktop": "npm run build && node --test tests/desktop-actions.test.mjs tests/desktop-agent.test.mjs && node tests/electron-smoke.mjs"
+    "test:desktop": "npm run build && node --test tests/desktop-actions.test.mjs tests/desktop-agent.test.mjs tests/roadmap-tools.test.mjs tests/media-formats.test.mjs && node tests/electron-smoke.mjs",
+    "test:windows-input": "node tests/windows-input-smoke.mjs",
+    "test:release": "node tests/release-smoke.mjs"
   },
   "dependencies": {
     "@pixi/unsafe-eval": "^6.5.10",
     "@tauri-apps/api": "2.12.4",
     "lucide-react": "0.468.0",
+    "music-metadata": "^12.5.0",
     "pixi-live2d-display": "^0.4.0",
     "pixi.js": "^6.5.10",
     "react": "19.3.1",

@@ -7,6 +7,10 @@ test.beforeEach(async ({ page }) => {
     const fixture = { musicProposal: false, captures: 0, lists: 0, stops: 0, contexts: 0, requests: [] as Record<string, unknown>[], actions: [] as { type: string; target: string }[], media: { available: true, state: 'stopped' as 'playing' | 'paused' | 'stopped', title: null as string | null, path: null as string | null, volume: 60, position: 0, duration: 30, playlist: [] as { title: string; path: string }[], index: -1, error: null, library: null as string | null, trackCount: 0, partial: false, scanning: false } };
     (window as unknown as { fixture: typeof fixture }).fixture = fixture;
     window.misakiDesktop = {
+      permissions: async () => ({enabled:{media:true,files:true,screen:true},folders:[],applications:[],tools:[]}),
+      setPermission: async () => ({enabled:{},folders:[],applications:[]}),
+      chooseGrant: async () => ({enabled:{},folders:[],applications:[]}),
+      revokeGrant: async () => ({enabled:{},folders:[],applications:[]}),
       backend: async (path, _method, body) => {
         if (path === '/v1/health') return { status: 200, body: { api_version: '1', status: 'ready', models: ['qwen3:4b'], route: 'local', detail: 'Fixture local model' } };
         if (path === '/v1/providers') return { status: 200, body: { providers: [{ provider: 'gemini', configured: true, models: ['gemini-test'] }, { provider: 'grok', configured: false, models: [] }] } };

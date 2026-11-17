@@ -1,5 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { validAction, type DesktopAction, type ScreenImage } from '../app/electron';
+import { validAction, type DesktopAction, type ScreenImage, type ToolResult } from '../app/electron';
 import { isEmotion, expressions, motions, type Emotion, type AvatarMetadata } from '../live2d/behavior';
 
 export type Provider = 'local' | 'gemini' | 'grok';
@@ -21,6 +21,7 @@ export interface ChatReply extends AvatarMetadata {
   actions?: DesktopAction[];
   emotion?: Emotion;
   message?: string;
+  continuation?: string;
 }
 export class ApiError extends Error {}
 
@@ -66,10 +67,11 @@ export async function getHealth(signal?: AbortSignal): Promise<Health> {
   return data;
 }
 
-export async function chat(input: { request_id: string; conversation_id: string; message: string; model: string; mode: Provider; history: Turn[]; desktop?: boolean; screen?: ScreenImage; desktop_context?: string; kind?: 'chat' | 'idle' }, signal: AbortSignal): Promise<ChatReply> {
+export async function chat(input: { request_id: string; conversation_id: string; message: string; model: string; mode: Provider; history: Turn[]; desktop?: boolean; screen?: ScreenImage; desktop_context?: string; kind?: 'chat' | 'idle'; tools?: string[]; continuation?: string; tool_results?: ToolResult[]; temperature?: number; max_tokens?: number }, signal: AbortSignal): Promise<ChatReply> {
   const data = await request('/v1/chat', 'POST', input, signal) as ChatReply;
   if (data.request_id !== input.request_id || typeof data.reply !== 'string' || data.route !== input.mode || data.status !== 'ok') throw new ApiError('The bridge returned an invalid reply.');
   if (data.actions !== undefined && (!Array.isArray(data.actions) || data.actions.length > 3 || !data.actions.every(validAction))) throw new ApiError('The model returned invalid desktop actions.');
+  if (data.continuation !== undefined && (!/^[a-f0-9-]{36}$/.test(data.continuation) || !data.actions?.length)) throw new ApiError('Invalid tool continuation.');
   if (!isEmotion(data.emotion)) data.emotion = undefined;
   if (!expressions.includes(data.expression!)) data.expression = undefined;
   if (!motions.includes(data.motion!)) data.motion = undefined;

@@ -1,10 +1,13 @@
 import path from 'node:path';
 import { realpath, stat } from 'node:fs/promises';
 import { mediaTypes } from './media.mjs';
+import { readFileSync } from 'node:fs';
+import { automationTypes, inputArguments } from './automation.mjs';
+export const toolRegistry = JSON.parse(readFileSync(new URL('../config/tools.json', import.meta.url), 'utf8'));
 
 const documents = new Set(['.txt', '.md', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.ppt', '.pptx', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac', '.mp4', '.mkv', '.webm']);
 const audio = new Set(['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac']);
-const types = new Set(['open_file', 'open_folder', 'open_website', 'reveal_file', 'focus_window', ...mediaTypes]);
+const types = new Set(toolRegistry.map(tool => tool.name));
 const folders = new Set(['home', 'desktop', 'documents', 'downloads', 'music', 'pictures', 'videos']);
 
 export function validateAction(value) {
@@ -12,6 +15,9 @@ export function validateAction(value) {
   if (['pause_media', 'resume_media', 'stop_media', 'next_track', 'previous_track', 'get_playback_status'].includes(value.type) && value.target !== '') throw new Error('This media control takes no target.');
   if (value.type === 'set_volume' && (!/^\d{1,3}$/.test(value.target) || Number(value.target) > 100)) throw new Error('Volume must be between 0 and 100.');
   if (value.type === 'focus_window' && !/^[a-f0-9-]{36}$/.test(value.target)) throw new Error('Choose a shared window first.');
+  if (value.type === 'close_application' && !/^[a-f0-9-]{36}$/.test(value.target)) throw new Error('Choose a shared window first.');
+  if (['get_active_window', 'get_system_info', 'take_screenshot'].includes(value.type) && value.target !== '') throw new Error('This tool takes no target.');
+  if (automationTypes.has(value.type)) inputArguments(value.type, value.target);
   return { type: value.type, target: value.target.trim() };
 }
 
@@ -22,7 +28,7 @@ export function website(target) {
 }
 
 // No command interpreter, executable launch, file reading, or model-supplied code.
-export function createActions({ app, dialog, shell, owner }) {
+export function createActions({ app, dialog, shell, owner, authorize }) {
   let running = false;
   return async raw => {
     if (running) throw new Error('Finish the current desktop action first.');
@@ -31,6 +37,7 @@ export function createActions({ app, dialog, shell, owner }) {
     running = true;
     try {
       let target = action.target;
+      let picked = false;
       if (action.type === 'open_website') target = website(target);
       else {
         if (action.type === 'open_folder' && folders.has(target.toLowerCase())) target = app.getPath(target.toLowerCase());
@@ -50,10 +57,12 @@ export function createActions({ app, dialog, shell, owner }) {
           }
           if (result.canceled || !result.filePaths[0]) return { status: 'cancelled', message: 'No item selected. You can choose one and try again.' };
           target = result.filePaths[0];
+          picked = true;
         }
         // Disallow UNC/network paths and Windows device/alternate stream paths.
         if (!path.isAbsolute(target) || target.startsWith('\\\\') || target.startsWith('//') || target.slice(2).includes(':')) throw new Error('Choose an absolute path on this computer.');
         target = await realpath(target);
+        if (authorize && !picked) target = await authorize(target);
         if (target.startsWith('\\\\') || target.startsWith('//') || target.slice(2).includes(':')) throw new Error('Network and device paths are unavailable.');
         const info = await stat(target);
         if (action.type === 'open_folder') {

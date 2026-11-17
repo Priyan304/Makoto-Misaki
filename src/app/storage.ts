@@ -1,7 +1,7 @@
 import type { Provider } from '../api/client';
-export interface Settings { model: string; provider: Provider; cloudModels: { gemini: string; grok: string }; alwaysOnTop: boolean; reducedMotion: boolean; rememberHistory: boolean; scale: number; idleAnimations: boolean; idleConversations: boolean; idleFrequency: number; idleCooldown: number; sleepyBehavior: boolean; sleepyAfter: number; animationIntensity: number }
+export interface Settings { model: string; provider: Provider; cloudModels: { gemini: string; grok: string }; alwaysOnTop: boolean; reducedMotion: boolean; rememberHistory: boolean; scale: number; idleAnimations: boolean; idleConversations: boolean; idleFrequency: number; idleCooldown: number; sleepyBehavior: boolean; sleepyAfter: number; animationIntensity: number; temperature: number; maxTokens: number; fallbackLocal: boolean }
 export interface Message { id: string; role: 'user' | 'assistant'; content: string; time: number; status: 'pending' | 'complete' | 'failed'; latency?: number; provider?: Provider }
-export const DEFAULTS: Settings = { model: 'qwen3:4b', provider: 'local', cloudModels: { gemini: '', grok: '' }, alwaysOnTop: true, reducedMotion: false, rememberHistory: false, scale: 1, idleAnimations: true, idleConversations: false, idleFrequency: 180, idleCooldown: 600, sleepyBehavior: true, sleepyAfter: 600, animationIntensity: 1 };
+export const DEFAULTS: Settings = { model: 'qwen3:4b', provider: 'local', cloudModels: { gemini: '', grok: '' }, alwaysOnTop: true, reducedMotion: false, rememberHistory: false, scale: 1, idleAnimations: true, idleConversations: false, idleFrequency: 180, idleCooldown: 600, sleepyBehavior: true, sleepyAfter: 600, animationIntensity: 1, temperature: .7, maxTokens: 4096, fallbackLocal: false };
 const KEY = 'misaki.settings.v1';
 const HISTORY = 'misaki.history.v1';
 export function readSettings(): Settings {
@@ -26,6 +26,9 @@ export function readSettings(): Settings {
       sleepyBehavior: stored.sleepyBehavior !== false,
       sleepyAfter: [300, 600, 1200].includes(stored.sleepyAfter) ? stored.sleepyAfter : DEFAULTS.sleepyAfter,
       animationIntensity: [.4, .7, 1].includes(stored.animationIntensity) ? stored.animationIntensity : DEFAULTS.animationIntensity,
+      temperature: [0.3, 0.7, 1].includes(stored.temperature) ? stored.temperature : .7,
+      maxTokens: [512, 1024, 4096, 8192].includes(stored.maxTokens) ? stored.maxTokens : 4096,
+      fallbackLocal: stored.fallbackLocal === true,
     };
   } catch { return DEFAULTS; }
 }
