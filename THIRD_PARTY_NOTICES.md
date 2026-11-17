@@ -9,7 +9,7 @@ This personal prototype includes the user-supplied Changli model, Live2D Core, a
 - PixiJS and `@pixi/unsafe-eval` 6.5.10: MIT, https://github.com/pixijs/pixijs. The latter installs Pixi's shader implementation for environments that disallow JavaScript eval.
 - `pixi-live2d-display` 0.4.0: MIT, https://github.com/guansss/pixi-live2d-display. Its unused publishing dependency `gh-pages` is overridden to a patched 6.x release.
 
-Installer bundling remains disabled. Review the supplied model's permissions and the applicable Cubism terms before distributing this project.
+An unsigned portable build can be created for this user's local use. Review the supplied model's permissions and the applicable Cubism terms before distributing this project; packaging does not establish redistribution rights.
 
 Dependencies retain their upstream licenses, available with their installed packages and repositories. Review the complete npm/Python/Cargo dependency inventories before distribution.
 
@@ -17,6 +17,7 @@ Dependencies retain their upstream licenses, available with their installed pack
 - Vite: https://github.com/vitejs/vite
 - Tauri: https://github.com/tauri-apps/tauri
 - Electron 45.2.1: MIT, https://github.com/electron/electron. Its bundled Chromium/Node dependencies retain their license notices in `node_modules/electron/dist/LICENSES.chromium.html` and `LICENSE`.
+- music-metadata: MIT, https://github.com/Borewit/music-metadata. Used only in the main process to read current-track tags and embedded artwork; its installed license is copied with runtime dependencies.
 - FastAPI: https://github.com/fastapi/fastapi
 - HTTPX: https://github.com/encode/httpx
 - Ollama (installed separately): https://github.com/ollama/ollama
@@ -42,4 +43,4 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ## Optional portable mpv runtime
 
-`npm run setup:media` downloads a pinned first-party mpv CI build from [mpv-player/mpv](https://github.com/mpv-player/mpv/releases/tag/git-release) into the ignored `.cache/mpv` directory and verifies its published SHA-256. Archive identity and hash are recorded in `provenance.json` there. This runtime is not embedded in the frontend or installer. mpv and its bundled FFmpeg/other components retain their upstream licenses; see [mpv copyright and licensing](https://github.com/mpv-player/mpv/blob/master/Copyright) and the corresponding build/source notices.
+`npm run setup:media` downloads a pinned first-party mpv CI build from [mpv-player/mpv](https://github.com/mpv-player/mpv/releases/tag/git-release) into the ignored `.cache/mpv` directory and verifies its published SHA-256. Archive identity and hash are recorded in `provenance.json` there. The portable local build copies this runtime and provenance under `resources/mpv`; it is never embedded in the frontend. mpv and its bundled FFmpeg/other components retain their upstream licenses; see [mpv copyright and licensing](https://github.com/mpv-player/mpv/blob/master/Copyright) and the corresponding build/source notices.

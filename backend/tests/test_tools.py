@@ -69,3 +69,24 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         for name in ['search_music','search_files','type_text','get_system_info']: self.assertIn(name,names)
         for call in [{'name':'exec','args':{'target':'cmd'}},{'name':'open_file','args':{'target':'x','command':'cmd'}},{'name':'type_text','args':{'target':json.dumps({'window':str(uuid4()),'text':'bad\ncommand'})}}]:
             with self.assertRaises(ValueError): validate_calls([call])
+
+    async def test_grok_native_results_keep_call_ids_and_failures(self):
+        requests=[]
+        async def upstream(request):
+            if request.url.path=='/v1/language-models': return httpx.Response(200,json={'models':[{'id':'grok-test','input_modalities':['text'],'output_modalities':['text']}]})
+            data=json.loads(request.content);requests.append(data)
+            if data['input'][-1].get('type')=='function_call_output':
+                return httpx.Response(200,json={'output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':'{"message":"The player could not start.","actions":[]}'}]}]})
+            return httpx.Response(200,json={'output':[{'type':'function_call','name':'play_media','arguments':'{"target":""}','call_id':'opaque-call'}]})
+        app=create_app(token='t'*40,cloud_transport=httpx.MockTransport(upstream))
+        async with app.router.lifespan_context(app),httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test',headers={'Authorization':'Bearer '+'t'*40}) as client:
+            await client.post('/v1/providers/grok',json={'api_key':'fixture-key-not-real'})
+            base={'conversation_id':str(uuid4()),'message':'Play music','mode':'grok','model':'grok-test','desktop':True,'tools':['play_media']}
+            first=await client.post('/v1/chat',json={**base,'request_id':str(uuid4())})
+            self.assertEqual(first.status_code,200,first.text)
+            result=await client.post('/v1/chat',json={**base,'request_id':str(uuid4()),'continuation':first.json()['continuation'],'tool_results':[{'status':'failed','message':'Player unavailable'}]})
+            self.assertEqual(result.status_code,200,result.text)
+            self.assertEqual(requests[-1]['input'][-1]['call_id'],'opaque-call')
+            self.assertIn('Player unavailable',requests[-1]['input'][-1]['output'])
+            self.assertEqual(requests[0]['tools'][0]['type'],'function')
+            self.assertFalse(requests[0]['store'])

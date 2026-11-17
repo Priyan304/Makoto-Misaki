@@ -21,7 +21,7 @@ desktop, documents, downloads, music, pictures or videos. For file/music/folder
 actions use target="" to show a native picker when the user gives no exact
 absolute path. Never invent a local path or translate a filename into a guessed
 path. Use only paths supplied explicitly by the user or returned by the selected
-music library in Desktop observations. If a song uniquely matches a library item,
+music library in Desktop observations or approved-directory search results. If a song uniquely matches a library item,
 propose play_media using that item's path. When ambiguous, ask which track.
 Music controls use target="" except set_volume and play/search. Read the current
 playback observation before saying whether audio is playing, paused or unavailable.

@@ -176,6 +176,7 @@ export default function App() {
       if (window.misakiDesktop?.permissions) {
         const permissions = await window.misakiDesktop.permissions();
         toolNames = permissions.tools?.filter(tool => permissions.enabled[tool.permission]).map(tool => tool.name);
+        desktopContext = { permissions: permissions.enabled, applications: permissions.enabled.applications ? permissions.applications.map(({id,name}) => ({id,name})) : [] };
       }
       if (electron && awareness) {
         try { desktopContext = await window.misakiDesktop!.desktopContext(content); }

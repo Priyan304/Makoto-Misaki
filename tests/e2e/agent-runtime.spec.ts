@@ -21,7 +21,7 @@ test.beforeEach(async ({page})=>{
    mediaStatus:async()=>({state:'stopped'}) as any,desktopContext:async()=>({permissions:f.enabled}),stopSharing:async()=>{},setAlwaysOnTop:async()=>{},reportInterface:async()=>{},
   } as any;
  });
- await page.goto('/');await expect(page.getByText('Here for you · Gemini cloud')).toBeVisible();
+ await page.goto('/',{waitUntil:'domcontentloaded'});await expect(page.getByText('Here for you · Gemini cloud')).toBeVisible();
 });
 test('search, approved open and final reply use actual tool results without fake user turns',async({page})=>{
  const input=page.getByRole('textbox',{name:'Message Misaki'});await input.fill('Find and open my DAA notes');await input.press('Enter');
@@ -54,4 +54,38 @@ test('permissions add and revoke folders, gate tools and persist within native s
  const input=page.getByRole('textbox',{name:'Message Misaki'});await input.fill('Hello');await input.press('Enter');
  await expect(page.locator('.desktop-action')).toHaveCount(1);
  expect(await page.evaluate(()=>(window as any).agentFixture.requests[0].tools)).toEqual(['type_text']);
+});
+
+test('approved app names remain available with music awareness off, without exposing executable paths',async({page})=>{
+ await page.evaluate(()=>localStorage.setItem('misaki.desktop-awareness.v1','off'));
+ await page.reload();
+ await page.getByRole('button',{name:'Preferences',exact:true}).click();
+ await page.getByRole('button',{name:'Add application',exact:true}).click();
+ await page.getByRole('switch',{name:'Application launching and closing'}).click();
+ await page.getByRole('button',{name:'← Back to your companion'}).click();
+ const input=page.getByRole('textbox',{name:'Message Misaki'});await input.fill('Open Notepad');await input.press('Enter');
+ await expect(page.locator('.desktop-action')).toHaveCount(1);
+ const request=await page.evaluate(()=>(window as any).agentFixture.requests[0]);
+ const observations=JSON.parse(request.desktop_context);
+ expect(observations.media.applications).toEqual([{id:'12345678-1234-1234-1234-123456789abc',name:'Notepad'}]);
+ expect(request.desktop_context).not.toContain('notepad.exe');
+ expect(observations.media).not.toHaveProperty('playback');
+});
+
+test('opt-in local fallback offers review without silently resending a failed cloud request',async({page})=>{
+ await page.getByRole('button',{name:'Preferences',exact:true}).click();
+ await page.getByRole('switch',{name:'Offer local fallback'}).click();
+ await page.getByRole('button',{name:'← Back to your companion'}).click();
+ await page.evaluate(()=>{
+  const api=window.misakiDesktop!;const original=api.backend;
+  api.backend=async(path,method,body)=>path==='/v1/chat'?(window as any).agentFixture.failures++ === 0?{status:503,body:{detail:'Fixture cloud unavailable'}}:original(path,method,body):original(path,method,body);
+  (window as any).agentFixture.failures=0;
+ });
+ const input=page.getByRole('textbox',{name:'Message Misaki'});await input.fill('Help me plan my day');await input.press('Enter');
+ await page.getByRole('button',{name:'Continue with local model'}).click();
+ await expect(input).toHaveValue('Help me plan my day');
+ await expect(page.getByText('Here for you · running locally')).toBeVisible();
+ expect(await page.evaluate(()=>(window as any).agentFixture.failures)).toBe(1);
+ await input.press('Enter');await expect(page.locator('.desktop-action')).toHaveCount(1);
+ expect(await page.evaluate(()=>(window as any).agentFixture.requests[0].mode)).toBe('local');
 });

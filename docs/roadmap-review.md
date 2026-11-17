@@ -1,4 +1,4 @@
-# Roadmap review — 17 November 2026
+# Roadmap review — verified 18 November 2026
 
 Reviewed the supplied `waifu-ai-development-roadmap.md` against the existing
 Electron/React/Python implementation before extending it. Phases 1 and 2 were
@@ -34,6 +34,28 @@ Signing, publication, automatic updates and redistribution permission for the
 supplied avatar remain owner-controlled release steps, not claimed as completed.
 Live Gemini/Grok tool accuracy remains an account-level acceptance check; tests
 use mock provider responses and do not spend user API credits.
+
+## Final verification
+
+- Production TypeScript/UI build and portable packaging passed.
+- 49 backend tests passed, including Gemini signature preservation, Grok call-ID
+  and failed-result handling, local native tools, conversation/replay boundaries and
+  the four-round limit.
+- Frontend unit checks and browser regressions passed. Cold-start browser
+  timeouts during packaging were rerun successfully after the build completed;
+  the new tool-flow tests wait for DOM readiness rather than background assets.
+- Real mpv passed WAV/FLAC/MP3 playback and embedded artist/artwork checks.
+- Native input passed click, literal typing, navigation key, scroll, active-window
+  information, revoked grants and graceful close in an isolated fixture window.
+- The final portable build passed fresh and warm startup with the actual avatar,
+  native permission enforcement, bundled bridge connectivity and helper shutdown.
+  Main view and Preferences screenshots were visually inspected.
+- Packaged runtime/control/registry/UI files match the working source. No keys,
+  development `.env`, chat history or personal grants were copied.
+
+Verified output: `release/Misaki-0.1.0-2026-11-17T21-34-36-331Z/Misaki.exe`.
+The folder name uses the build's UTC timestamp. See [release instructions](desktop-release.md)
+for setup and the distinction between this local portable preview and publication.
 
 ## Previously completed avatar and idle behavior
 

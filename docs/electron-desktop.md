@@ -2,7 +2,7 @@
 
 Run `npm run desktop`. If that desktop profile is already running, the launcher brings its window forward and exits successfully, retaining the existing bridge, provider keys and conversation. Otherwise it builds the interface, creates a session secret, starts the authenticated Python bridge and a static loopback UI server, waits for that server, then launches Electron 45. A browser-only session or another service occupying ports 1420/8765 still produces a port conflict; stop that session before starting a new desktop. Closing the window or launcher stops the owned servers. Electron watches the launcher's PID rather than stdin: Windows GUI processes can receive immediate stdin EOF while their launcher is still alive. Python and the UI servers retain their stdin EOF cleanup. Browser development remains `npm run dev`. Installation downloads Electron via the npm postinstall script; if Windows certificate validation requires the system store, use `NODE_USE_SYSTEM_CA=1` rather than disabling verification.
 
-The desktop is a source-run development application. Python and backend requirements are still needed; it does not include an installer, packaged sidecar or automatic updates. Legacy Tauri files remain available but are not called by the Electron launcher.
+Development launches need Python and backend requirements. `npm run package:desktop` also creates a portable Windows build with Electron, the Python bridge and mpv bundled; open its `Misaki.exe` without a development toolchain. This is an unsigned preview, with no automatic updates. See [portable release](desktop-release.md). Legacy Tauri files remain available but are not called by the Electron launcher.
 
 `MISAKI_UI_PORT` and `MISAKI_BRIDGE_PORT` can select distinct non-privileged loopback ports. The launcher suite uses isolated 11420/18765 ports so it can test Electron startup and abrupt parent shutdown without stopping an existing user session on the defaults.
 
@@ -12,7 +12,33 @@ The Electron GUI is spawned with `windowsHide: false`; console helpers and the h
 
 ## Actions and model contract
 
-All three existing providers use the same bounded response contract when chat includes `desktop: true`: `{reply, actions}`. The backend appends the desktop instructions to the persona, validates at most three actions with Pydantic and exposes only approved action types. Plain replies remain usable if a model ignores the contract; malformed JSON produces a retry message without executable proposals. A browser conversation does not enable the contract. The backend never executes OS actions.
+The 17 November extension adds native function calling and controlled file/app/input
+tools. The authoritative list is `config/tools.json`, shared by Electron, the
+frontend and Python. Gemini preserves complete function-call parts and thought
+signatures; Grok preserves response output and call IDs; capable Ollama models
+receive native tools. The validated JSON contract below remains the compatibility
+fallback. After approving or skipping all proposed actions, **Send results to
+Misaki** returns real outcomes to the same model. Turns expire after ten minutes,
+are single-use, and stop after four rounds. Provider/conversation changes prevent
+continuation. Idle messages cannot request tools.
+
+Preferences has independent files, media, screen, applications, input and system
+permissions. File search and metadata are restricted to picker-approved roots;
+resolved paths, junctions and traversal are checked at use. App launching accepts
+only saved executable IDs and no arguments. Closing a shared window asks native
+confirmation and sends a graceful close request. Input uses fixed Win32 calls in
+shared Notepad/Calculator/Paint windows, with literal typing limited to Notepad.
+Each input action has a native preview/confirmation and checks foreground focus,
+modifier keys and click occlusion. If focus changes, input stops. No arbitrary
+PowerShell or shell command is accepted from the model.
+
+`search_music` aliases music search; `search_files`, `get_file_information`,
+`open_application`, `close_application`, `get_active_window`, `get_system_info`,
+`click_mouse`, `type_text`, `press_key` and `scroll_window` extend the table below.
+`take_screenshot` opens the existing picker/preview, never captures or sends
+silently. System information excludes user identity/network inventory.
+
+The compatibility fallback for all three providers uses bounded dialogue/avatar JSON with `message` (also returned as `reply`) and `actions` when chat includes `desktop: true`. The backend appends the desktop instructions to the persona, validates at most three actions with Pydantic and exposes only approved action types. Plain replies remain usable if a model ignores the contract; malformed JSON produces a retry message without executable proposals. A browser conversation does not enable the contract. The backend never executes OS actions.
 
 | Type | Target | Native behavior |
 | --- | --- | --- |
@@ -28,7 +54,7 @@ All three existing providers use the same bounded response contract when chat in
 | `reveal_file` | Existing absolute file path, or empty | Reveal the selected file in Explorer |
 | `open_website` | HTTP/HTTPS URL | Default browser |
 
-The user approves the displayed target with its Open, Play or Show in Explorer button in chat; there is no second native confirmation. Empty paths use a Choose file/folder/music button and native picker. The picker is brought forward with its owner and temporarily releases the owner's always-on-top setting so it remains reachable. Cancelled and failed cards retain a Try again button; successful actions cannot accidentally replay from the same card. The main process revalidates the action, resolves symlinks, checks the actual file type and existence, rejects network/device/alternate-stream paths, and rejects scripts/executables for opening. No command interpreter or arbitrary process spawning is exposed. Only one native action can run at a time. Music actions route through the Desktop Agent to mpv instead of the shell opener. Opening an audio file explicitly with open_file still uses its associated application.
+Basic file and media actions are approved with their Open, Play or Show in Explorer button in chat, without a second confirmation. Input and close requests have the additional native confirmation described above. Empty paths use a Choose file/folder/music button and native picker. The picker is brought forward with its owner and temporarily releases the owner's always-on-top setting so it remains reachable. Cancelled and failed cards retain a Try again button; successful actions cannot accidentally replay from the same card. The main process revalidates the action, resolves symlinks, checks the actual file type and existence, rejects network/device/alternate-stream paths, and rejects scripts/executables for opening. No command interpreter or arbitrary process spawning is exposed. Only one native action can run at a time. Music actions route through the Desktop Agent to mpv instead of the shell opener. Opening an audio file explicitly with open_file still uses its associated application.
 
 Success, cancellation and errors appear in chat and are part of the selected provider's next-turn context. Success means the OS accepted the open request, not that another application's document finished loading. Proposals are in memory separately from persisted messages; reload cannot replay them. Audio and document contents are not uploaded by these tools. Paths the user types, opted-in matching music filenames, playback state, action-result labels and any opted-in chat history follow the selected provider/history rules. An explicitly attached screen image is uploaded only for that message.
 
@@ -49,7 +75,7 @@ npm run setup:media
 npm run desktop
 ```
 
-The setup script verifies the published SHA-256 before extraction, uses the system TLS trust store, and makes no PATH/default-player changes. It installs no registry entries and does not run mpv's registration scripts. The archive and provenance remain in `.cache/mpv`; the player is not shipped in the application bundle. On another platform, install an appropriate mpv build and set the process environment variable `MISAKI_MPV_PATH` to its absolute executable path. See the [mpv installation page](https://mpv.io/installation/) and [JSON IPC manual](https://mpv.io/manual/stable/#json-ipc).
+The setup script verifies the published SHA-256 before extraction, uses the system TLS trust store, and makes no PATH/default-player changes. It installs no registry entries and does not run mpv's registration scripts. The archive and provenance remain in `.cache/mpv`; the portable release copies the player and provenance into its resources folder. On another platform, install an appropriate mpv build and set the process environment variable `MISAKI_MPV_PATH` to its absolute executable path. See the [mpv installation page](https://mpv.io/installation/) and [JSON IPC manual](https://mpv.io/manual/stable/#json-ipc).
 
 Open **Desktop tools → Choose music folder**. This explicit choice indexes at most 10,000 entries / 5,000 audio files, skips links outside the root, and remembers the folder in the Electron profile's `desktop-agent.json`. Choose the same folder again to refresh its index. Matching titles and paths can accompany chat while **Use playback state and matching song names in chat** is enabled; switching it off persists across launches. No automatic personal-folder scan happens before a folder has been chosen. Audio contents remain local.
 
@@ -65,13 +91,13 @@ The picker uses Electron [desktopCapturer](https://www.electronjs.org/docs/lates
 
 The authenticated bridge sends Gemini inline image data, Grok Responses image input only for models advertising image support, or Ollama base64 images only after `/api/show` advertises vision. It never silently switches providers. A text-only model returns a clear error. See [Gemini image understanding](https://ai.google.dev/gemini-api/docs/image-understanding), [Grok image input](https://docs.x.ai/developers/model-capabilities/images/understanding), and [Ollama chat](https://docs.ollama.com/api/chat).
 
-A selected application window also receives an expiring opaque focus grant. A user-requested `focus_window` proposal is still approved in chat; Electron rechecks the source and native title before a fixed Windows helper restores/focuses it. Misaki then minimizes so its always-on-top window cannot cover the target; Ctrl+Shift+M brings her back. No mouse clicks, typing, arbitrary keyboard shortcuts or unattended desktop loop are implemented in this phase. Text in screenshots, titles and filenames is treated as untrusted data, never authorization for an action.
+A selected application window also receives an expiring opaque focus grant. A user-requested `focus_window` proposal is still approved in chat; Electron rechecks the source and native title before a fixed Windows helper restores/focuses it. Misaki then minimizes so its always-on-top window cannot cover the target; Ctrl+Shift+M brings her back. The same selected-window grant supports the individually confirmed input tools described above. Arbitrary keyboard shortcuts and unattended desktop loops remain unavailable. Text in screenshots, titles and filenames is treated as untrusted data, never authorization for an action.
 
 ## Validation
 
-`npm run test:desktop` covers native boundaries and a real Electron window with the actual avatar, built UI server, authenticated preload, provider setup, cloud-error recovery, action retries and warm restart. It also runs a real installed mpv against generated silent WAV fixtures to verify play/pause/resume, next/previous, volume, stop and accurate status. A missing mpv installation skips that one real-player check and leaves the deterministic boundary tests active; install it with setup:media first for full validation.
+`npm run test:desktop` covers native boundaries and a real Electron window with the actual avatar, built UI server, authenticated preload, provider setup, cloud-error recovery, action retries and warm restart. It also runs a real installed mpv against generated silent WAV, FLAC and MP3 fixtures to verify play/pause/resume, next/previous, volume, stop and accurate status. A missing mpv installation skips that one real-player check and leaves the deterministic boundary tests active; install it with setup:media first for full validation.
 
-Screen tests use a repository-image fixture through the real main/preload IPC; no personal screen images or live cloud credits are used. Browser regressions check preview-before-send, removal/revocation, one-shot attachments, no image persistence, provider changes, media controls and awareness opt-out. Backend tests verify image serialization for Gemini, vision Grok and local Ollama, reject text-only models, and enforce image/request bounds. Native focus is exercised with an injected focus adapter; tests do not focus personal applications. These checks do not establish live cloud visual-answer quality.
+Screen tests use a repository-image fixture through the real main/preload IPC; no personal screen images or live cloud credits are used. Browser regressions check preview-before-send, removal/revocation, one-shot attachments, no image persistence, provider changes, media controls and awareness opt-out. Backend tests verify image serialization for Gemini, vision Grok and local Ollama, reject text-only models, and enforce image/request bounds. The focus adapter has isolated boundary tests. `npm run test:windows-input` exercises actual Win32 input and graceful close in a temporary fixture window, never personal applications. These checks do not establish live cloud visual-answer quality.
 
 ## Startup rendering and recovery
 

@@ -22,6 +22,11 @@ try {
   const system=await page.evaluate(()=>window.misakiDesktop.action({type:'get_system_info',target:''})); assert.equal(system.status,'completed');
   await page.evaluate(()=>window.misakiDesktop.setPermission({permission:'system',enabled:false}));
   await page.screenshot({path:`test-results/release-${pass}.png`});
+  if(pass==='cold') {
+    await page.getByRole('button',{name:'Preferences',exact:true}).click();
+    await page.getByRole('heading',{name:'Desktop permissions'}).scrollIntoViewIfNeeded();
+    await page.screenshot({path:'test-results/release-permissions.png'});
+  }
   await desktop.close(); desktop=null;
   for(const port of ports) {
     let closed=false;

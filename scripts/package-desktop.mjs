@@ -28,5 +28,6 @@ for(const name of packages) {
 await cp(path.join(build,'dist','misaki-bridge'),path.join(output,'resources','bridge'),{recursive:true});
 await cp(path.join(root,'.cache','mpv'),path.join(output,'resources','mpv'),{recursive:true});
 await cp(path.join(root,'docs','desktop-release.md'),path.join(output,'README.md'));
+await cp(path.join(root,'THIRD_PARTY_NOTICES.md'),path.join(output,'THIRD_PARTY_NOTICES.md'));
 await writeFile(path.join(output,'build-info.json'),JSON.stringify({version,builtAt:new Date().toISOString(),platform:process.platform,arch:process.arch,signed:false},null,2));
 console.log(`Portable build ready: ${output}\nOpen Misaki.exe. No .env, saved keys, chats or personal library grants were copied.`);
