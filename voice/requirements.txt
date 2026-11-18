@@ -1,0 +1,4 @@
+# Isolated prototype only; never install into backend/.venv.
+chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@ab55923c27757c90cfcc407baa57dc25a7d25217
+psutil==7.2.2
+truststore==0.10.5

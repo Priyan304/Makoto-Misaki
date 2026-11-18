@@ -1,0 +1,9 @@
+{
+  "voice": "oneesan-f2",
+  "delivery": "warm",
+  "languages": ["en", "ja"],
+  "approved_on": "2026-11-18",
+  "approved_audition": "20261118-180741",
+  "reference": "F2_happy_free_02.wav",
+  "reference_sha256": "6c10e57beb028f691a9be42e61abc7713477c6c6748359c4ed8e937103ae0cd5"
+}

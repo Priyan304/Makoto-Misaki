@@ -41,6 +41,21 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+## Optional local voice prototype
+
+The standalone `voice/` prototype uses Chatterbox Multilingual V3 and Perth (MIT),
+PyTorch/torchaudio and audio-processing dependencies, plus pykakasi (GPL-3.0)
+for Japanese normalization. Exact versions, model provenance and other licences
+are documented in [the local voice notes](docs/local-voice.md). Model weights,
+the Python voice environment and reference recordings are not included in the
+portable app. Current references come from the JVNV corpus by Detai Xin,
+Junfeng Jiang, Shinnosuke Takamichi, Yuki Saito, Akiko Aizawa and Hiroshi Saruwatari,
+using litagin's version with nonverbal segments removed, under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+[Original corpus](https://sites.google.com/site/shinnosuketakamichi/research-topics/jvnv_corpus),
+[reference dataset](https://huggingface.co/datasets/litagin/jvnv_corpus_v1_no_nv).
+Attribution and source hashes accompany the local references and generated auditions.
+
 ## Optional portable mpv runtime
 
 `npm run setup:media` downloads a pinned first-party mpv CI build from [mpv-player/mpv](https://github.com/mpv-player/mpv/releases/tag/git-release) into the ignored `.cache/mpv` directory and verifies its published SHA-256. Archive identity and hash are recorded in `provenance.json` there. The portable local build copies this runtime and provenance under `resources/mpv`; it is never embedded in the frontend. mpv and its bundled FFmpeg/other components retain their upstream licenses; see [mpv copyright and licensing](https://github.com/mpv-player/mpv/blob/master/Copyright) and the corresponding build/source notices.

@@ -108,6 +108,15 @@ Verification: build passed, 3 controller tests, 10 backend tests and 4 browser t
 
 Avatar update, 30 October 2026: production build, 3 controller tests and 6 browser tests passed. The browser suite loads the real supplied model, checks hide/show recovery under the desktop CSP, verifies reduced motion and exercises the fallback for failed model requests. Every supplied expression is checked against rendered pixels, including reset to neutral and combining toggles. The enlarged hip-up framing and expression menu were visually inspected in studio and compact screenshots. npm reported zero known vulnerabilities after patching the renderer's transitive publishing dependency. Native rendering has not yet been exercised.
 
+## Local voice prototype
+
+Local voice prototype (English/Japanese, standalone): `npm run setup:voice`, then
+`npm run voice:sample`. Setup uses an isolated Python environment and downloads
+model files; later generation runs offline. The current default auditions a
+natural Japanese female reference, with warm/playful/comforting audition presets.
+It is not connected to chat or the avatar yet.
+See [voice setup, measurements and scope](docs/local-voice.md).
+
 ## Project layout
 
 ```text
